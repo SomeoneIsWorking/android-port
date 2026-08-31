@@ -29,6 +29,7 @@ def temporary_directory() -> tempfile.TemporaryDirectory[str]:
 
 def main() -> int:
     assert android_port.SHARED_AVD == "codex_shared_api35"
+    assert android_port.DEFAULT_ANDROID_API == 21
     assert android_port.adb_devices_from_output(
         "List of devices attached\nemulator-5554\tdevice\nphone\toffline\n"
     ) == ("emulator-5554",)

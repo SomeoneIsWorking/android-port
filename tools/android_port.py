@@ -19,6 +19,7 @@ from collections.abc import Sequence
 
 
 SHARED_AVD = "codex_shared_api35"
+DEFAULT_ANDROID_API = 21
 ROOT = Path(__file__).resolve().parents[1]
 NATIVE_DEPS_SOURCE = ROOT / "android_port" / "native_deps"
 DEPENDENCY_CAPABILITY_FILES = {
@@ -679,7 +680,7 @@ def parse_args() -> argparse.Namespace:
     dependencies.add_argument("--ndk", type=Path, required=True)
     dependencies.add_argument("--prefix", type=Path, required=True)
     dependencies.add_argument("--abi", choices=("arm64-v8a", "x86_64"), default="arm64-v8a")
-    dependencies.add_argument("--api", type=int, default=26)
+    dependencies.add_argument("--api", type=int, default=DEFAULT_ANDROID_API)
     dependencies.add_argument("--jobs", type=int, default=max(1, min(os.cpu_count() or 1, 4)))
     profile_dependencies = commands.add_parser(
         "build-profile-native-deps",
