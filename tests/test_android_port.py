@@ -38,6 +38,18 @@ def main() -> int:
     assert "-DCMAKE_INSTALL_LIBDIR=lib" in configure
     assert "-DCMAKE_INSTALL_PREFIX=/work/prefix" in configure
     assert android_port.native_dependency_manifest(contract) == Path("/work/prefix/android-port-dependencies.json")
+    assert android_port.native_dependency_cxx_runtime(contract) == Path(
+        "/work/prefix/share/android-port/cxx/arm64-v8a/libc++_shared.so"
+    )
+    assert android_port.ffmpeg_assembly_configuration("arm64-v8a") == ()
+    assert android_port.ffmpeg_assembly_configuration("x86_64") == (
+        "--disable-x86asm", "--disable-inline-asm"
+    )
+    assert "api=26" in android_port.ffmpeg_contract(contract)
+    assert android_port.ffmpeg_contract(contract).splitlines()[-1] == "api=26"
+    assert android_port.ffmpeg_required_files(contract.prefix)[0] == Path(
+        "/work/prefix/include/libavutil/avutil.h"
+    )
     with tempfile.TemporaryDirectory() as temporary:
         ndk = Path(temporary) / "ndk"
         cxx_shared = (

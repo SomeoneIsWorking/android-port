@@ -5,13 +5,18 @@ Shared Android packaging and device-verification plumbing for native game ports.
 Lucent owns the reusable Android runtime shell (SDL Activity, app-private data, SAF staging, and raw
 touch contacts). A game owns its package identity, native entry point, game-file validation, touch
 actions/layout, UI art, and release evidence. This repository owns the build/packaging seam between
-them: pinned Gradle/NDK contract validation, native-artifact staging, APK inspection, and the common
-Android Virtual Device policy.
+them: pinned Gradle/NDK contract validation, the common cross-compiled native
+dependency prefix, native-artifact staging, APK inspection, and the common Android
+Virtual Device policy. The prefix holds the pinned SDL3, SDL3_image, FreeType,
+fmt, and minimal static FFmpeg set required by native ports; its manifest records
+the ABI/API and FFmpeg configuration so a title never combines host libraries with
+Android artifacts.
 
-Every package with native C++ code must stage the library returned by
-`ndk_cxx_shared_library(ndk, abi)` as `jniLibs/<abi>/libc++_shared.so` and require that same path
-in its APK inspection. This is title-neutral NDK runtime plumbing; it belongs here rather than in
-each game's build script.
+Every package with native C++ code stages the prefix's
+`share/android-port/cxx/<abi>/libc++_shared.so` as
+`jniLibs/<abi>/libc++_shared.so` and requires that same path in its APK
+inspection. The prefix copies it from `ndk_cxx_shared_library(ndk, abi)`, so
+title Gradle files never recreate NDK architecture lookup.
 
 ## Shared emulator
 
@@ -43,7 +48,15 @@ uv run --frozen python tools/android_port.py with-emulator-lock \
 
 ## Consumer contract
 
-A consumer invokes this tool to check the configured SDK, NDK and coherent JDK before its own CMake
-and Gradle build. It supplies title-specific Gradle source, assets, package ID, version and signing
-credentials. Release signing is never synthesized here; the consuming title must provide its
-maintainer key and validate the assembled artifact.
+A consumer invokes this tool to build the configured SDK/NDK native prefix before
+its own CMake and Gradle build:
+
+```sh
+uv run --frozen python tools/android_port.py build-native-deps \
+  --ndk "$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION" \
+  --abi arm64-v8a --api 34 --prefix /path/to/build/deps/android/arm64-v8a
+```
+
+It supplies title-specific Gradle source, assets, package ID, version and signing
+credentials. Release signing is never synthesized here; the consuming title must
+provide its maintainer key and validate the assembled artifact.
