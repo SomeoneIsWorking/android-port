@@ -54,7 +54,7 @@ its own CMake and Gradle build:
 ```sh
 uv run --frozen python tools/android_port.py build-native-deps \
   --ndk "$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION" \
-  --abi arm64-v8a --api 34 --prefix /path/to/build/deps/android/arm64-v8a
+  --abi arm64-v8a --api 21 --prefix /path/to/build/deps/android/android-21/arm64-v8a
 ```
 
 It supplies title-specific Gradle source, assets, package ID, version and signing
@@ -72,8 +72,8 @@ Gradle task selection stay in the title.
   "schema": 1,
   "nativeDependencies": {
     "abi": "arm64-v8a",
-    "api": 26,
-    "prefix": "../../build/deps/android/arm64-v8a",
+    "api": 21,
+    "prefix": "../../build/deps/android/android-21/arm64-v8a",
     "capabilities": ["sdl3", "image", "font", "format", "media"]
   },
   "package": {
