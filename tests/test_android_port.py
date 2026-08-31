@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import sys
+import tarfile
 import tempfile
 
 
@@ -50,6 +51,14 @@ def main() -> int:
     assert android_port.ffmpeg_required_files(contract.prefix)[0] == Path(
         "/work/prefix/include/libavutil/avutil.h"
     )
+    members = [tarfile.TarInfo("FFmpeg-n7.1.1"), tarfile.TarInfo("FFmpeg-n7.1.1/configure")]
+    assert android_port.ffmpeg_archive_root(members) == "FFmpeg-n7.1.1"
+    try:
+        android_port.ffmpeg_archive_root([*members, tarfile.TarInfo("elsewhere/x")])
+    except SystemExit as error:
+        assert "exactly one top-level directory" in str(error)
+    else:
+        raise AssertionError("FFmpeg archive with two roots was accepted")
     with tempfile.TemporaryDirectory() as temporary:
         ndk = Path(temporary) / "ndk"
         cxx_shared = (
