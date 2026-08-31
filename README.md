@@ -8,6 +8,11 @@ actions/layout, UI art, and release evidence. This repository owns the build/pac
 them: pinned Gradle/NDK contract validation, native-artifact staging, APK inspection, and the common
 Android Virtual Device policy.
 
+Every package with native C++ code must stage the library returned by
+`ndk_cxx_shared_library(ndk, abi)` as `jniLibs/<abi>/libc++_shared.so` and require that same path
+in its APK inspection. This is title-neutral NDK runtime plumbing; it belongs here rather than in
+each game's build script.
+
 ## Shared emulator
 
 `codex_shared_api35` is the workspace's persistent API 35 Pixel 7 AVD. It is one foreground device:
@@ -25,6 +30,16 @@ uv run --frozen python tools/android_port.py with-emulator-lock \
 
 The lock path is deliberately supplied by the workspace, rather than hidden in a user home, so every
 participating project contends for the same resource. A device command must name its ADB serial.
+
+When testing with user-supplied files in a Downloads directory, name the one-off directory
+`*-emulator-test` and remove it through the bounded cleanup command, under the same lock:
+
+```sh
+uv run --frozen python tools/android_port.py with-emulator-lock \
+  --lock /home/bhamil/repo/benefactor/coord/android-emulator.lock -- \
+  uv run --frozen python tools/android_port.py remove-emulator-test-directory \
+  --serial emulator-5554 --path /sdcard/Download/benefactor-emulator-test
+```
 
 ## Consumer contract
 

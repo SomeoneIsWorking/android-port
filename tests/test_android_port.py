@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import sys
+import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,6 +38,26 @@ def main() -> int:
     assert "-DCMAKE_INSTALL_LIBDIR=lib" in configure
     assert "-DCMAKE_INSTALL_PREFIX=/work/prefix" in configure
     assert android_port.native_dependency_manifest(contract) == Path("/work/prefix/android-port-dependencies.json")
+    with tempfile.TemporaryDirectory() as temporary:
+        ndk = Path(temporary) / "ndk"
+        cxx_shared = (
+            ndk
+            / "toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib"
+            / "aarch64-linux-android/libc++_shared.so"
+        )
+        cxx_shared.parent.mkdir(parents=True)
+        cxx_shared.touch()
+        assert android_port.ndk_cxx_shared_library(ndk, "arm64-v8a") == cxx_shared
+    assert android_port.removable_emulator_test_directory(
+        "/sdcard/Download/benefactor-emulator-test"
+    ) == "/sdcard/Download/benefactor-emulator-test"
+    for path in ("/sdcard/Download", "/sdcard/Download/nested/emulator-test", "/sdcard/Documents/test-emulator-test"):
+        try:
+            android_port.removable_emulator_test_directory(path)
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError(f"expected cleanup refusal for {path}")
     print("android-port: shared AVD contract passed")
     return 0
 
