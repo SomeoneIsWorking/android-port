@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 import sys
 import tarfile
@@ -11,6 +12,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
+TEST_SCRATCH = ROOT / "scratch" / "test-android-port"
 SPEC = importlib.util.spec_from_file_location(
     "android_port", ROOT / "tools/android_port.py"
 )
@@ -18,6 +20,11 @@ assert SPEC is not None and SPEC.loader is not None
 android_port = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = android_port
 SPEC.loader.exec_module(android_port)
+
+
+def temporary_directory() -> tempfile.TemporaryDirectory[str]:
+    TEST_SCRATCH.mkdir(parents=True, exist_ok=True)
+    return tempfile.TemporaryDirectory(dir=TEST_SCRATCH)
 
 
 def main() -> int:
@@ -59,7 +66,7 @@ def main() -> int:
         assert "exactly one top-level directory" in str(error)
     else:
         raise AssertionError("FFmpeg archive with two roots was accepted")
-    with tempfile.TemporaryDirectory() as temporary:
+    with temporary_directory() as temporary:
         ndk = Path(temporary) / "ndk"
         cxx_shared = (
             ndk
@@ -79,6 +86,123 @@ def main() -> int:
             pass
         else:
             raise AssertionError(f"expected cleanup refusal for {path}")
+    with temporary_directory() as temporary:
+        workspace = Path(temporary)
+        profile_path = workspace / "title/platform/android/android-port-profile.json"
+        prefix = workspace / "build/deps/android/arm64-v8a"
+        native_library = workspace / "title/build/android/arm64-v8a/libmain.so"
+        profile_path.parent.mkdir(parents=True)
+        native_library.parent.mkdir(parents=True)
+        native_library.write_bytes(b"title runtime")
+        for relative in android_port.NATIVE_DEPENDENCY_FILES:
+            artifact = prefix / relative
+            artifact.parent.mkdir(parents=True, exist_ok=True)
+            artifact.write_bytes(relative.encode("utf-8"))
+        cxx_runtime = prefix / "share/android-port/cxx/arm64-v8a/libc++_shared.so"
+        cxx_runtime.parent.mkdir(parents=True, exist_ok=True)
+        cxx_runtime.write_bytes(b"ndk runtime")
+        (prefix / "android-port-dependencies.json").write_text(
+            json.dumps(
+                {
+                    "schema": 1,
+                    "abi": "arm64-v8a",
+                    "platform": "android-26",
+                    "capabilities": list(android_port.DEPENDENCY_CAPABILITY_FILES),
+                }
+            ),
+            encoding="utf-8",
+        )
+        profile_path.write_text(
+            json.dumps(
+                {
+                    "schema": 1,
+                    "nativeDependencies": {
+                        "abi": "arm64-v8a",
+                        "api": 26,
+                        "prefix": "../../../build/deps/android/arm64-v8a",
+                        "capabilities": list(android_port.DEPENDENCY_CAPABILITY_FILES),
+                    },
+                    "package": {
+                        "nativeLibrary": "../../build/android/arm64-v8a/libmain.so",
+                        "jniLibs": "../../build/android/native",
+                    },
+                    "sharedEmulator": {
+                        "lock": "../../../coord/android-emulator.lock",
+                        "serial": "emulator-5554",
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        profile = android_port.load_android_port_profile(profile_path)
+        assert profile.prefix == prefix
+        assert profile.emulator_lock == workspace / "coord/android-emulator.lock"
+        assert android_port.native_dependency_request_for_profile(
+            profile, Path("/sdk/ndk/28.2.13676358")
+        ) == android_port.NativeDependencyRequest(
+            abi="arm64-v8a",
+            api=26,
+            ndk=Path("/sdk/ndk/28.2.13676358"),
+            prefix=prefix,
+        )
+        assert android_port.package_runtime_sources(profile) == (
+            ("libmain.so", native_library),
+            ("libSDL3.so", prefix / "lib/libSDL3.so"),
+            ("libc++_shared.so", cxx_runtime),
+        )
+        assert android_port.stage_package_runtime(profile) == 0
+        staged = workspace / "title/build/android/native/arm64-v8a"
+        assert (staged / "libmain.so").read_bytes() == b"title runtime"
+        assert (staged / "libSDL3.so").read_bytes() == b"lib/libSDL3.so"
+        assert (staged / "libc++_shared.so").read_bytes() == b"ndk runtime"
+        assert android_port.profile_adb_command(
+            profile, ["adb", "-s", "emulator-5554", "install", "game.apk"]
+        ) == ("adb", "-s", "emulator-5554", "install", "game.apk")
+        try:
+            android_port.profile_adb_command(
+                profile, ["adb", "-s", "another-device", "install", "game.apk"]
+            )
+        except SystemExit as error:
+            assert "emulator-5554" in str(error)
+        else:
+            raise AssertionError("profile lock accepted a non-profile ADB serial")
+        narrow_profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        narrow_profile["nativeDependencies"]["capabilities"] = ["sdl3", "media"]
+        profile_path.write_text(json.dumps(narrow_profile), encoding="utf-8")
+        media_profile = android_port.load_android_port_profile(profile_path)
+        assert media_profile.capabilities == ("sdl3", "media")
+        assert android_port.package_runtime_sources(media_profile) == (
+            ("libmain.so", native_library),
+            ("libSDL3.so", prefix / "lib/libSDL3.so"),
+            ("libc++_shared.so", cxx_runtime),
+        )
+        invalid_profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        invalid_profile["nativeDependencies"]["capabilities"] = ["sdl3", "invented-codec"]
+        profile_path.write_text(json.dumps(invalid_profile), encoding="utf-8")
+        try:
+            android_port.load_android_port_profile(profile_path)
+        except SystemExit as error:
+            assert "invented-codec" in str(error)
+        else:
+            raise AssertionError("profile accepted an unknown capability")
+        profile_path.write_text(json.dumps(narrow_profile), encoding="utf-8")
+        (prefix / "android-port-dependencies.json").write_text(
+            json.dumps(
+                {
+                    "schema": 1,
+                    "abi": "arm64-v8a",
+                    "platform": "android-34",
+                    "capabilities": list(android_port.DEPENDENCY_CAPABILITY_FILES),
+                }
+            ),
+            encoding="utf-8",
+        )
+        try:
+            android_port.package_runtime_sources(media_profile)
+        except SystemExit as error:
+            assert "platform='android-34', expected 'android-26'" in str(error)
+        else:
+            raise AssertionError("profile accepted a prefix built for another API")
     print("android-port: shared AVD contract passed")
     return 0
 
