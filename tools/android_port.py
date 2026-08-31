@@ -7,7 +7,7 @@ import argparse
 from dataclasses import dataclass
 import fcntl
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import sys
@@ -28,6 +28,10 @@ NATIVE_DEPENDENCY_FILES = (
     "lib/cmake/fmt/fmt-config.cmake",
     "share/android-port/sdl3-java/org/libsdl/app/SDLActivity.java",
 )
+NDK_TRIPLES = {
+    "arm64-v8a": "aarch64-linux-android",
+    "x86_64": "x86_64-linux-android",
+}
 
 
 @dataclass(frozen=True)
@@ -36,6 +40,21 @@ class NativeDependencyRequest:
     api: int
     ndk: Path
     prefix: Path
+
+
+def ndk_cxx_shared_library(ndk: Path, abi: str) -> Path:
+    """Return the C++ runtime library required by an Android native package."""
+    triple = NDK_TRIPLES.get(abi)
+    if triple is None:
+        raise SystemExit(f"Android ABI has no NDK C++ runtime mapping: {abi}")
+    prebuilt = ndk / "toolchains" / "llvm" / "prebuilt"
+    roots = list(prebuilt.glob("*/sysroot/usr/lib"))
+    if len(roots) != 1:
+        raise SystemExit(f"expected one NDK LLVM sysroot under {prebuilt}, found {len(roots)}")
+    library = roots[0] / triple / "libc++_shared.so"
+    if not library.is_file():
+        raise SystemExit(f"NDK C++ runtime is missing: {library}")
+    return library
 
 
 def native_dependency_manifest(request: NativeDependencyRequest) -> Path:
@@ -206,6 +225,30 @@ def with_emulator_lock(lock_path: Path, command: Sequence[str]) -> int:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
+def removable_emulator_test_directory(directory: str) -> str:
+    path = PurePosixPath(directory)
+    root = PurePosixPath("/sdcard/Download")
+    try:
+        relative = path.relative_to(root)
+    except ValueError as error:
+        raise SystemExit(
+            "emulator cleanup accepts only a child of /sdcard/Download"
+        ) from error
+    if len(relative.parts) != 1 or not relative.name.endswith("-emulator-test"):
+        raise SystemExit(
+            "emulator cleanup accepts only one /sdcard/Download/*-emulator-test directory"
+        )
+    return str(path)
+
+
+def remove_emulator_test_directory(serial: str, directory: str) -> int:
+    target = removable_emulator_test_directory(directory)
+    adb = executable("adb")
+    subprocess.run([adb, "-s", serial, "shell", "rm", "-rf", "--", target], check=True)
+    print(f"removed Android emulator test directory: {target}")
+    return 0
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="operation", required=True)
@@ -224,6 +267,11 @@ def parse_args() -> argparse.Namespace:
     dependencies.add_argument("--abi", choices=("arm64-v8a", "x86_64"), default="arm64-v8a")
     dependencies.add_argument("--api", type=int, default=26)
     dependencies.add_argument("--jobs", type=int, default=max(1, min(os.cpu_count() or 1, 4)))
+    cleanup = commands.add_parser(
+        "remove-emulator-test-directory", help="remove one bounded Downloads test directory"
+    )
+    cleanup.add_argument("--serial", required=True)
+    cleanup.add_argument("--path", required=True)
     return parser.parse_args()
 
 
@@ -246,6 +294,8 @@ def main() -> int:
             ),
             args.jobs,
         )
+    if args.operation == "remove-emulator-test-directory":
+        return remove_emulator_test_directory(args.serial, args.path)
     raise AssertionError(f"unknown command {args.operation}")
 
 
