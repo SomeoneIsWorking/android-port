@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "abi": "@ANDROID_ABI@",
+  "platform": "@ANDROID_PLATFORM@",
+  "sdl3Revision": "@ANDROID_PORT_SDL3_REVISION@",
+  "sdl3ImageRevision": "@ANDROID_PORT_SDL3_IMAGE_REVISION@",
+  "freetypeRevision": "@ANDROID_PORT_FREETYPE_REVISION@",
+  "fmtRevision": "@ANDROID_PORT_FMT_REVISION@",
+  "sdl3Java": "share/android-port/sdl3-java"
+}

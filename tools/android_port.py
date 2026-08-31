@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import fcntl
 import os
 from pathlib import Path
@@ -14,6 +15,103 @@ from collections.abc import Sequence
 
 
 SHARED_AVD = "codex_shared_api35"
+ROOT = Path(__file__).resolve().parents[1]
+NATIVE_DEPS_SOURCE = ROOT / "android_port" / "native_deps"
+NATIVE_DEPENDENCY_FILES = (
+    "lib/libSDL3.so",
+    "lib/libSDL3_image.a",
+    "lib/libfreetype.a",
+    "lib/libfmt.a",
+    "lib/cmake/SDL3/SDL3Config.cmake",
+    "lib/cmake/SDL3_image/SDL3_imageConfig.cmake",
+    "lib/cmake/freetype/freetype-config.cmake",
+    "lib/cmake/fmt/fmt-config.cmake",
+    "share/android-port/sdl3-java/org/libsdl/app/SDLActivity.java",
+)
+
+
+@dataclass(frozen=True)
+class NativeDependencyRequest:
+    abi: str
+    api: int
+    ndk: Path
+    prefix: Path
+
+
+def native_dependency_manifest(request: NativeDependencyRequest) -> Path:
+    return request.prefix / "android-port-dependencies.json"
+
+
+def native_dependency_configure_command(
+    request: NativeDependencyRequest, build_directory: Path
+) -> list[str]:
+    return [
+        "cmake",
+        "-S",
+        str(NATIVE_DEPS_SOURCE),
+        "-B",
+        str(build_directory),
+        f"-DCMAKE_TOOLCHAIN_FILE={request.ndk / 'build/cmake/android.toolchain.cmake'}",
+        f"-DANDROID_ABI={request.abi}",
+        f"-DANDROID_PLATFORM=android-{request.api}",
+        "-DANDROID_STL=c++_shared",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_INSTALL_LIBDIR=lib",
+        f"-DCMAKE_INSTALL_PREFIX={request.prefix}",
+    ]
+
+
+def stage_native_dependency_metadata(
+    request: NativeDependencyRequest, build_directory: Path
+) -> None:
+    manifest = build_directory / "android-port-dependencies.json"
+    if not manifest.is_file():
+        raise SystemExit(f"Android dependency build omitted its manifest: {manifest}")
+    java_source = build_directory / "sources" / "sdl3" / "android-project" / "app" / "src" / "main" / "java"
+    if not java_source.is_dir():
+        raise SystemExit(f"Android dependency build omitted SDL3 Java sources: {java_source}")
+    request.prefix.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(manifest, native_dependency_manifest(request))
+    shutil.copytree(
+        java_source,
+        request.prefix / "share" / "android-port" / "sdl3-java",
+        dirs_exist_ok=True,
+    )
+
+
+def build_native_dependencies(request: NativeDependencyRequest, jobs: int) -> int:
+    toolchain = request.ndk / "build" / "cmake" / "android.toolchain.cmake"
+    if not toolchain.is_file():
+        raise SystemExit(f"Android NDK toolchain is missing: {toolchain}")
+    if jobs <= 0:
+        raise SystemExit("build-native-deps --jobs must be positive")
+    build_directory = ROOT / "build" / "native-deps" / f"{request.abi}-api{request.api}"
+    subprocess.run(native_dependency_configure_command(request, build_directory), check=True)
+    subprocess.run(
+        [
+            "cmake",
+            "--build",
+            str(build_directory),
+            "--target",
+            "android_port_native_dependencies",
+            "--parallel",
+            str(jobs),
+        ],
+        check=True,
+    )
+    stage_native_dependency_metadata(request, build_directory)
+    missing = [
+        request.prefix / relative
+        for relative in ("android-port-dependencies.json", *NATIVE_DEPENDENCY_FILES)
+        if not (request.prefix / relative).is_file()
+    ]
+    if missing:
+        raise SystemExit(
+            "Android dependency install omitted required artifacts:\\n"
+            + "\\n".join(str(path) for path in missing)
+        )
+    print(f"Android dependency prefix: {request.prefix}")
+    return 0
 
 
 def executable(name: str) -> str:
@@ -118,6 +216,14 @@ def parse_args() -> argparse.Namespace:
     )
     lock.add_argument("--lock", type=Path, required=True)
     lock.add_argument("invocation", nargs=argparse.REMAINDER)
+    dependencies = commands.add_parser(
+        "build-native-deps", help="build the pinned SDL3, SDL3_image, and FreeType Android prefix"
+    )
+    dependencies.add_argument("--ndk", type=Path, required=True)
+    dependencies.add_argument("--prefix", type=Path, required=True)
+    dependencies.add_argument("--abi", choices=("arm64-v8a", "x86_64"), default="arm64-v8a")
+    dependencies.add_argument("--api", type=int, default=26)
+    dependencies.add_argument("--jobs", type=int, default=max(1, min(os.cpu_count() or 1, 4)))
     return parser.parse_args()
 
 
@@ -130,6 +236,16 @@ def main() -> int:
         if command[:1] == ["--"]:
             command = command[1:]
         return with_emulator_lock(args.lock, command)
+    if args.operation == "build-native-deps":
+        return build_native_dependencies(
+            NativeDependencyRequest(
+                abi=args.abi,
+                api=args.api,
+                ndk=args.ndk.resolve(),
+                prefix=args.prefix.resolve(),
+            ),
+            args.jobs,
+        )
     raise AssertionError(f"unknown command {args.operation}")
 
 
