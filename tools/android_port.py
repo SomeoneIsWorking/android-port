@@ -21,22 +21,37 @@ from collections.abc import Sequence
 SHARED_AVD = "codex_shared_api35"
 ROOT = Path(__file__).resolve().parents[1]
 NATIVE_DEPS_SOURCE = ROOT / "android_port" / "native_deps"
-NATIVE_DEPENDENCY_FILES = (
-    "lib/libSDL3.so",
-    "lib/libSDL3_image.a",
-    "lib/libfreetype.a",
-    "lib/libfmt.a",
-    "lib/cmake/SDL3/SDL3Config.cmake",
-    "lib/cmake/SDL3_image/SDL3_imageConfig.cmake",
-    "lib/cmake/freetype/freetype-config.cmake",
-    "lib/cmake/fmt/fmt-config.cmake",
-    "share/android-port/sdl3-java/org/libsdl/app/SDLActivity.java",
-    "include/libavutil/avutil.h",
-    "lib/libavformat.a",
-    "lib/libavcodec.a",
-    "lib/libswscale.a",
-    "lib/libswresample.a",
-    "lib/libavutil.a",
+DEPENDENCY_CAPABILITY_FILES = {
+    "sdl3": (
+        "lib/libSDL3.so",
+        "lib/cmake/SDL3/SDL3Config.cmake",
+        "share/android-port/sdl3-java/org/libsdl/app/SDLActivity.java",
+    ),
+    "image": (
+        "lib/libSDL3_image.a",
+        "lib/cmake/SDL3_image/SDL3_imageConfig.cmake",
+    ),
+    "font": (
+        "lib/libfreetype.a",
+        "lib/cmake/freetype/freetype-config.cmake",
+    ),
+    "format": (
+        "lib/libfmt.a",
+        "lib/cmake/fmt/fmt-config.cmake",
+    ),
+    "media": (
+        "include/libavutil/avutil.h",
+        "lib/libavformat.a",
+        "lib/libavcodec.a",
+        "lib/libswscale.a",
+        "lib/libswresample.a",
+        "lib/libavutil.a",
+    ),
+}
+NATIVE_DEPENDENCY_FILES = tuple(
+    relative
+    for capability in DEPENDENCY_CAPABILITY_FILES.values()
+    for relative in capability
 )
 NDK_TRIPLES = {
     "arm64-v8a": "aarch64-linux-android",
@@ -59,6 +74,196 @@ class NativeDependencyRequest:
     prefix: Path
 
 
+@dataclass(frozen=True)
+class AndroidPortProfile:
+    """Consumer-owned package inputs that are shared Android-port policy."""
+
+    source: Path
+    abi: str
+    api: int
+    capabilities: tuple[str, ...]
+    prefix: Path
+    native_library: Path
+    jni_libs: Path
+    emulator_lock: Path
+    emulator_serial: str
+
+
+def profile_relative_path(profile: Path, value: object, field: str) -> Path:
+    if not isinstance(value, str) or not value:
+        raise SystemExit(f"Android profile {field} must be a non-empty relative path")
+    candidate = Path(value)
+    if candidate.is_absolute():
+        raise SystemExit(f"Android profile {field} must be relative to {profile}")
+    return (profile.parent / candidate).resolve()
+
+
+def profile_object(value: object, field: str) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise SystemExit(f"Android profile {field} must be an object")
+    return value
+
+
+def profile_string(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise SystemExit(f"Android profile {field} must be a non-empty string")
+    return value
+
+
+def profile_capabilities(value: object) -> tuple[str, ...]:
+    if not isinstance(value, list) or not value or not all(isinstance(item, str) for item in value):
+        raise SystemExit("Android profile nativeDependencies.capabilities must be a non-empty string list")
+    capabilities = tuple(value)
+    unknown = sorted(set(capabilities) - DEPENDENCY_CAPABILITY_FILES.keys())
+    if unknown:
+        raise SystemExit("Android profile declares unsupported capability: " + ", ".join(unknown))
+    if len(set(capabilities)) != len(capabilities):
+        raise SystemExit("Android profile nativeDependencies.capabilities must not repeat a capability")
+    if "sdl3" not in capabilities:
+        raise SystemExit("Android profile nativeDependencies.capabilities must include sdl3")
+    return capabilities
+
+
+def dependency_files(capabilities: Sequence[str]) -> tuple[str, ...]:
+    return tuple(
+        relative
+        for capability in capabilities
+        for relative in DEPENDENCY_CAPABILITY_FILES[capability]
+    )
+
+
+def native_dependency_request_for_profile(profile: AndroidPortProfile, ndk: Path) -> NativeDependencyRequest:
+    """Keep ABI/API/prefix selection in the portable title profile, not each build command."""
+    return NativeDependencyRequest(
+        abi=profile.abi,
+        api=profile.api,
+        ndk=ndk.resolve(),
+        prefix=profile.prefix,
+    )
+
+
+def load_android_port_profile(path: Path) -> AndroidPortProfile:
+    """Load the portable consumer manifest for shared package/device mechanics."""
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise SystemExit(f"Android profile is unreadable: {path}: {error}") from error
+    root = profile_object(value, "root")
+    if root.get("schema") != 1:
+        raise SystemExit(f"Android profile {path} has unsupported schema {root.get('schema')!r}")
+    dependencies = profile_object(root.get("nativeDependencies"), "nativeDependencies")
+    package = profile_object(root.get("package"), "package")
+    emulator = profile_object(root.get("sharedEmulator"), "sharedEmulator")
+    abi = profile_string(dependencies.get("abi"), "nativeDependencies.abi")
+    if abi not in NDK_TRIPLES:
+        raise SystemExit(f"Android profile declares unsupported ABI {abi!r}")
+    api = dependencies.get("api")
+    if not isinstance(api, int) or api <= 0:
+        raise SystemExit("Android profile nativeDependencies.api must be a positive integer")
+    lock = profile_relative_path(path, emulator.get("lock"), "sharedEmulator.lock")
+    if lock.parts[-2:] != ("coord", "android-emulator.lock"):
+        raise SystemExit(
+            "Android profile sharedEmulator.lock must resolve to coord/android-emulator.lock"
+        )
+    native_library = profile_relative_path(path, package.get("nativeLibrary"), "package.nativeLibrary")
+    if native_library.name != "libmain.so":
+        raise SystemExit("Android profile package.nativeLibrary must name libmain.so")
+    jni_libs = profile_relative_path(path, package.get("jniLibs"), "package.jniLibs")
+    if "build" not in jni_libs.parts:
+        raise SystemExit("Android profile package.jniLibs must be under the title build directory")
+    return AndroidPortProfile(
+        source=path.resolve(),
+        abi=abi,
+        api=api,
+        capabilities=profile_capabilities(dependencies.get("capabilities")),
+        prefix=profile_relative_path(path, dependencies.get("prefix"), "nativeDependencies.prefix"),
+        native_library=native_library,
+        jni_libs=jni_libs,
+        emulator_lock=lock,
+        emulator_serial=profile_string(emulator.get("serial"), "sharedEmulator.serial"),
+    )
+
+
+def validate_native_dependency_prefix(profile: AndroidPortProfile) -> None:
+    """Reject a prefix that was not built for the profile's ABI and API."""
+    manifest = profile.prefix / "android-port-dependencies.json"
+    try:
+        value = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise SystemExit(f"Android dependency manifest is unreadable: {manifest}: {error}") from error
+    if not isinstance(value, dict):
+        raise SystemExit(f"Android dependency manifest must be an object: {manifest}")
+    expected = {"schema": 1, "abi": profile.abi, "platform": f"android-{profile.api}"}
+    disagreements = [
+        f"{key}={value.get(key)!r}, expected {wanted!r}"
+        for key, wanted in expected.items()
+        if value.get(key) != wanted
+    ]
+    declared_capabilities = value.get("capabilities")
+    if not isinstance(declared_capabilities, list) or not all(
+        isinstance(capability, str) for capability in declared_capabilities
+    ):
+        disagreements.append("capabilities missing or not a string list")
+        declared = set()
+    else:
+        declared = set(declared_capabilities)
+    unavailable = sorted(set(profile.capabilities) - declared)
+    if unavailable:
+        disagreements.append("missing declared capabilities: " + ", ".join(unavailable))
+    missing = [
+        profile.prefix / relative
+        for relative in dependency_files(profile.capabilities)
+        if not (profile.prefix / relative).is_file()
+    ]
+    runtime = native_dependency_cxx_runtime_path(profile.prefix, profile.abi)
+    if not runtime.is_file():
+        missing.append(runtime)
+    if disagreements or missing:
+        details = [*disagreements, *(f"missing {item}" for item in missing)]
+        raise SystemExit("Android dependency prefix disagrees with profile:\n  " + "\n  ".join(details))
+
+
+def package_runtime_sources(profile: AndroidPortProfile) -> tuple[tuple[str, Path], ...]:
+    """Return the exact native runtime files that every shared package must stage."""
+    validate_native_dependency_prefix(profile)
+    if not profile.native_library.is_file():
+        raise SystemExit(
+            f"Android package profile requires title runtime {profile.native_library}; "
+            "a setup-only APK is not a package milestone"
+        )
+    cxx_runtime = native_dependency_cxx_runtime_path(profile.prefix, profile.abi)
+    return (
+        ("libmain.so", profile.native_library),
+        ("libSDL3.so", profile.prefix / "lib/libSDL3.so"),
+        ("libc++_shared.so", cxx_runtime),
+    )
+
+
+def stage_package_runtime(profile: AndroidPortProfile) -> int:
+    """Stage title and shared runtime libraries into Gradle's JNI source directory."""
+    sources = package_runtime_sources(profile)
+    destination = profile.jni_libs / profile.abi
+    destination.mkdir(parents=True, exist_ok=True)
+    for name, source in sources:
+        shutil.copy2(source, destination / name)
+    print(f"Android package runtime staged: {destination}")
+    return 0
+
+
+def profile_adb_command(profile: AndroidPortProfile, command: Sequence[str]) -> tuple[str, ...]:
+    """Require the profile's exact shared-device serial before taking the lock."""
+    if len(command) < 4 or Path(command[0]).name != "adb" or command[1:3] != ["-s", profile.emulator_serial]:
+        raise SystemExit(
+            "profile-emulator-lock requires `adb -s "
+            f"{profile.emulator_serial} ...` after --"
+        )
+    return tuple(command)
+
+
+def with_profile_emulator_lock(profile: AndroidPortProfile, command: Sequence[str]) -> int:
+    return with_emulator_lock(profile.emulator_lock, profile_adb_command(profile, command))
+
+
 def ndk_cxx_shared_library(ndk: Path, abi: str) -> Path:
     """Return the C++ runtime library required by an Android native package."""
     triple = NDK_TRIPLES.get(abi)
@@ -78,8 +283,12 @@ def native_dependency_manifest(request: NativeDependencyRequest) -> Path:
     return request.prefix / "android-port-dependencies.json"
 
 
+def native_dependency_cxx_runtime_path(prefix: Path, abi: str) -> Path:
+    return prefix / "share/android-port/cxx" / abi / "libc++_shared.so"
+
+
 def native_dependency_cxx_runtime(request: NativeDependencyRequest) -> Path:
-    return request.prefix / "share/android-port/cxx" / request.abi / "libc++_shared.so"
+    return native_dependency_cxx_runtime_path(request.prefix, request.abi)
 
 
 def ffmpeg_assembly_configuration(abi: str) -> tuple[str, ...]:
@@ -255,6 +464,7 @@ def publish_dependency_manifest(request: NativeDependencyRequest) -> None:
         "contract": ffmpeg_contract(request).splitlines(),
         "libraries": list(FFMPEG_LIBRARIES),
     }
+    content["capabilities"] = list(DEPENDENCY_CAPABILITY_FILES)
     manifest.write_text(json.dumps(content, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
@@ -471,6 +681,26 @@ def parse_args() -> argparse.Namespace:
     dependencies.add_argument("--abi", choices=("arm64-v8a", "x86_64"), default="arm64-v8a")
     dependencies.add_argument("--api", type=int, default=26)
     dependencies.add_argument("--jobs", type=int, default=max(1, min(os.cpu_count() or 1, 4)))
+    profile_dependencies = commands.add_parser(
+        "build-profile-native-deps",
+        help="build the selected profile's shared Android prefix",
+    )
+    profile_dependencies.add_argument("--profile", type=Path, required=True)
+    profile_dependencies.add_argument("--ndk", type=Path, required=True)
+    profile_dependencies.add_argument(
+        "--jobs", type=int, default=max(1, min(os.cpu_count() or 1, 4))
+    )
+    package = commands.add_parser(
+        "stage-package-runtime",
+        help="validate one Android profile and stage its title/SDL/C++ runtime libraries",
+    )
+    package.add_argument("--profile", type=Path, required=True)
+    profile_lock = commands.add_parser(
+        "with-profile-emulator-lock",
+        help="run one profile-bound ADB command under the shared emulator lock",
+    )
+    profile_lock.add_argument("--profile", type=Path, required=True)
+    profile_lock.add_argument("invocation", nargs=argparse.REMAINDER)
     cleanup = commands.add_parser(
         "remove-emulator-test-directory", help="remove one bounded Downloads test directory"
     )
@@ -497,6 +727,20 @@ def main() -> int:
                 prefix=args.prefix.resolve(),
             ),
             args.jobs,
+        )
+    if args.operation == "stage-package-runtime":
+        return stage_package_runtime(load_android_port_profile(args.profile.resolve()))
+    if args.operation == "build-profile-native-deps":
+        profile = load_android_port_profile(args.profile.resolve())
+        return build_native_dependencies(
+            native_dependency_request_for_profile(profile, args.ndk), args.jobs
+        )
+    if args.operation == "with-profile-emulator-lock":
+        command = args.invocation
+        if command[:1] == ["--"]:
+            command = command[1:]
+        return with_profile_emulator_lock(
+            load_android_port_profile(args.profile.resolve()), command
         )
     if args.operation == "remove-emulator-test-directory":
         return remove_emulator_test_directory(args.serial, args.path)

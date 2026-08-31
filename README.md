@@ -60,3 +60,65 @@ uv run --frozen python tools/android_port.py build-native-deps \
 It supplies title-specific Gradle source, assets, package ID, version and signing
 credentials. Release signing is never synthesized here; the consuming title must
 provide its maintainer key and validate the assembled artifact.
+
+## Package profile
+
+A title puts one portable `platform/android/android-port-profile.json` beside its Gradle project.
+It declares only the shared build/package inputs; title identity, JNI, SAF wording, touch layout and
+Gradle task selection stay in the title.
+
+```json
+{
+  "schema": 1,
+  "nativeDependencies": {
+    "abi": "arm64-v8a",
+    "api": 26,
+    "prefix": "../../build/deps/android/arm64-v8a",
+    "capabilities": ["sdl3", "image", "font", "format", "media"]
+  },
+  "package": {
+    "nativeLibrary": "../../build/android/arm64-v8a/libmain.so",
+    "jniLibs": "../../build/android/native"
+  },
+  "sharedEmulator": {
+    "lock": "../../../coord/android-emulator.lock",
+    "serial": "emulator-5554"
+  }
+}
+```
+
+All paths are relative to the profile, so the file has no machine-specific path. `jniLibs` is a
+title build output, not a source-tree directory. The title supplies its host NDK path once; ABI, API and
+prefix then come only from the profile:
+
+```sh
+uv run --frozen python tools/android_port.py build-profile-native-deps \
+  --profile platform/android/android-port-profile.json \
+  --ndk "$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION"
+```
+
+After the title builds `libmain.so`, stage the exact runtime set that its Gradle source set consumes:
+
+```sh
+uv run --frozen python tools/android_port.py stage-package-runtime \
+  --profile platform/android/android-port-profile.json
+```
+
+The bounded capabilities are `sdl3`, `image`, `font`, `format`, and `media`. `sdl3` is required because
+every package stages its SDL runtime; the other entries name the title's actual image, font/FreeType,
+fmt, and FFmpeg needs. This refuses unknown or duplicate selections, a prefix whose manifest ABI/API or
+declared capabilities do not match the profile, an incomplete selected capability, or a setup-only
+package without `libmain.so`. It stages exactly `libmain.so`, `libSDL3.so`, and the matching NDK
+`libc++_shared.so` below `jniLibs/<abi>/`; the title's package inspection then verifies the resulting APK
+and its own signing/asset policy.
+
+Interactive shared-emulator work always goes through the same profile instead of spelling a second
+lock path or serial:
+
+```sh
+uv run --frozen python tools/android_port.py with-profile-emulator-lock \
+  --profile platform/android/android-port-profile.json -- \
+  adb -s emulator-5554 install -r build/android/project/app.apk
+```
+
+The command rejects a different ADB serial before it acquires the lock.
