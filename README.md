@@ -30,7 +30,7 @@ device work.
 ./run.sh
 uv run --frozen python tools/android_port.py emulator-status --require-running
 uv run --frozen python tools/android_port.py with-emulator-lock \
-  --lock /home/bhamil/repo/psx/coord/android-emulator.lock -- adb -s emulator-5554 install -r game.apk
+  --lock <workspace>/coord/android-emulator.lock -- adb -s emulator-5554 install -r game.apk
 ```
 
 The lock path is deliberately supplied by the workspace, rather than hidden in a user home, so every
@@ -41,7 +41,7 @@ When testing with user-supplied files in a Downloads directory, name the one-off
 
 ```sh
 uv run --frozen python tools/android_port.py with-emulator-lock \
-  --lock /home/bhamil/repo/benefactor/coord/android-emulator.lock -- \
+  --lock <workspace>/coord/android-emulator.lock -- \
   uv run --frozen python tools/android_port.py remove-emulator-test-directory \
   --serial emulator-5554 --path /sdcard/Download/benefactor-emulator-test
 ```
