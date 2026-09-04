@@ -1,0 +1,63 @@
+name: Android packaging plumbing CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-contract:
+    name: Linux host synthetic package contract
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@b75a909f75acd358c2196fb9a5f1299a9a8868a4 # v6.7.0
+        with:
+          version: "0.10.12"
+          enable-cache: false
+      - name: Run synthetic profile, staging, archive, and emulator-policy tests
+        run: uv run --frozen python tests/test_android_port.py
+
+  android-arm64:
+    name: Android arm64-v8a API 35 native dependency prefix
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@b75a909f75acd358c2196fb9a5f1299a9a8868a4 # v6.7.0
+        with:
+          version: "0.10.12"
+          enable-cache: false
+      - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+        with:
+          packages: >-
+            platforms;android-35
+            build-tools;35.0.0
+            cmake;3.31.6
+            ndk;28.2.13676358
+      - name: Select the pinned Android CMake
+        run: echo "$ANDROID_SDK_ROOT/cmake/3.31.6/bin" >> "$GITHUB_PATH"
+      - name: Build the pinned asset-free Android dependency prefix
+        env:
+          ANDROID_NDK_VERSION: "28.2.13676358"
+        run: >-
+          uv run --frozen python tools/android_port.py build-native-deps
+          --ndk "$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION"
+          --abi arm64-v8a --api 35 --prefix "$PWD/build/ci/android/arm64-v8a-api35"
+          --jobs 2
