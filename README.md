@@ -29,6 +29,11 @@ title Gradle files never recreate NDK architecture lookup.
 
 ## Shared emulator
 
+For an ARM64 guest on an x86-64 Linux host, the optional
+[Cuttlefish launcher](docs/android-emulator.md) holds this same device lock.
+It requires a provisioned host bundle, system images, and immutable container;
+its current image qualification limitations are recorded in that contract.
+
 `codex_shared_api35` is the workspace's persistent API 35 Pixel 7 AVD. It is one foreground device:
 builds may run concurrently, but an APK install, launch, input, screenshot, logcat capture, or other
 interactive device operation must hold the shared lock. Do not create a second AVD merely to avoid a
