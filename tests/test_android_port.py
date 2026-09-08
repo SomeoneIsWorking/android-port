@@ -62,7 +62,7 @@ def main() -> int:
     assert android_port.native_dependency_cxx_runtime(contract) == Path(
         "/work/prefix/share/android-port/cxx/arm64-v8a/libc++_shared.so"
     )
-    assert android_port.ffmpeg_assembly_configuration("arm64-v8a") == ()
+    assert android_port.ffmpeg_assembly_configuration("arm64-v8a") == ("--disable-asm",)
     assert android_port.ffmpeg_assembly_configuration("x86_64") == (
         "--disable-x86asm",
         "--disable-inline-asm",
