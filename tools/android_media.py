@@ -25,7 +25,13 @@ FFMPEG_FEATURES = (
 
 def ffmpeg_assembly_configuration(abi: str) -> tuple[str, ...]:
     """Keep emulator FFmpeg independent of a host NASM installation."""
-    return ("--disable-x86asm", "--disable-inline-asm") if abi == "x86_64" else ()
+    if abi == "x86_64":
+        return ("--disable-x86asm", "--disable-inline-asm")
+    # FFmpeg 7.1.1's AArch64 transform objects contain absolute table
+    # relocations; they cannot be linked into Android's PIE shared library even
+    # when --enable-pic and -fPIC are enabled.  The portable C transforms retain
+    # the complete decoder contract and are the only safe Android ARM64 input.
+    return ("--disable-asm",)
 
 
 def ffmpeg_contract(request: NativeDependencyRequest) -> str:
