@@ -32,8 +32,21 @@ Its guest identifies as Android 17 with fingerprint
 `generic/aosp_cf_arm64_only_phone/vsoc_arm64_only:17/CP2A.260605.016/16102939:userdebug/test-keys`.
 QEMU 10.2.90 stays live and ADB becomes available, but the first boot encountered
 an upstream `WebViewZygote.getProcess` null `ChildZygoteProcess` after a WebView
-preload socket timeout. ADB accessibility alone therefore does not qualify this
-image or prove an APK can be installed.
+preload socket timeout. Android automatically restarted its framework and then
+reported `sys.boot_completed=1`; first boot took approximately 25 minutes under
+TCG. The host VM did not restart. User-storage unlock follows system boot, so
+wait for the storage path as well before transferring an import fixture. This
+does not establish app compatibility or clean-boot reliability.
+
+The prepared Android 16 fallback is build 14654133, API 36.1, fingerprint
+`generic/aosp_cf_arm64_only_phone/vsoc_arm64_only:16/BP4A.251205.006/14654133:userdebug/test-keys`.
+Its two archives passed the Build API's MD5 checks and have these SHA-256 values;
+preparation alone is not guest boot evidence:
+
+| Input | SHA-256 |
+| --- | --- |
+| `aosp_cf_arm64_only_phone-userdebug` / `aosp_cf_arm64_only_phone-img-14654133.zip` | `a5cd16d8f4a0f56ae5a18224ad4c95c678d4931e9c8526507d29d03083b1dd99` |
+| `aosp_cf_x86_64_only_phone-userdebug` / `cvd-host_package.tar.gz` | `3f5696fa7efe5d3b49fba61de8dda95f7106af21f438642b868f0bdd75e09da5` |
 
 Use the official orchestration container as the host environment. The examined
 base digest is
@@ -61,6 +74,18 @@ is bound to that disk-backed directory. `--early_tmp_dir` points into the runtim
 mount because the launcher hardlinks its early log to the final log. Separate
 mounts would fail with `EXDEV`. The legacy assembly symlink must be outside the
 actual runtime assembly directory, or it becomes a self-reference.
+
+The instance's `internal` runtime directory is a bounded 4.5 GiB container tmpfs.
+Upstream QEMU places its 4 GiB guest RAM backing file there. A regular disk-backed
+directory caused approximately 100 GiB of writes during initial boot and put all
+four TCG threads into disk wait as the host reclaimed those file-cache pages.
+Guest RAM and internal IPC state are volatile; Android userdata, image inputs,
+and logs remain on disk. This mount does not change guest memory size or Android
+checks. It avoids treating continuously modified guest RAM as persistent data.
+The container also requests a 5 GiB soft memory reservation for guest RAM and
+QEMU overhead. This is a reclamation preference, not a hard memory cap or an
+allocation guarantee. On a busy host, verify the emulator's resident/swap usage;
+an almost entirely swapped guest cannot provide useful interactive evidence.
 
 The guest intentionally has no external networking: `tap` mode with TAP devices
 disabled is sufficient for local ADB/package tests. The examined upstream
