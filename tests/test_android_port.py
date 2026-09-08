@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import importlib.util
 import json
-from pathlib import Path
 import sys
 import tarfile
 import tempfile
-
+import zipfile
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 TEST_SCRATCH = ROOT / "scratch" / "test-android-port"
@@ -30,6 +32,12 @@ def temporary_directory() -> tempfile.TemporaryDirectory[str]:
 def main() -> int:
     assert android_port.SHARED_AVD == "codex_shared_api35"
     assert android_port.DEFAULT_ANDROID_API == 21
+    from android_java import java_major
+
+    assert java_major('openjdk version "26.0.1"') == 26
+    assert java_major("javac 26.0.1") == 26
+    assert java_major('openjdk version "1.8.0_442"') == 8
+    assert java_major("not a compiler version") is None
     assert android_port.adb_devices_from_output(
         "List of devices attached\nemulator-5554\tdevice\nphone\toffline\n"
     ) == ("emulator-5554",)
@@ -40,26 +48,41 @@ def main() -> int:
         ndk=Path("/sdk/ndk/28.2.13676358"),
         prefix=Path("/work/prefix"),
     )
-    configure = android_port.native_dependency_configure_command(contract, Path("/work/build"))
+    configure = android_port.native_dependency_configure_command(
+        contract, Path("/work/build")
+    )
     assert configure[:4] == ["cmake", "-S", str(android_port.NATIVE_DEPS_SOURCE), "-B"]
     assert "-DANDROID_ABI=arm64-v8a" in configure
     assert "-DANDROID_PLATFORM=android-26" in configure
     assert "-DCMAKE_INSTALL_LIBDIR=lib" in configure
     assert "-DCMAKE_INSTALL_PREFIX=/work/prefix" in configure
-    assert android_port.native_dependency_manifest(contract) == Path("/work/prefix/android-port-dependencies.json")
+    assert android_port.native_dependency_manifest(contract) == Path(
+        "/work/prefix/android-port-dependencies.json"
+    )
     assert android_port.native_dependency_cxx_runtime(contract) == Path(
         "/work/prefix/share/android-port/cxx/arm64-v8a/libc++_shared.so"
     )
     assert android_port.ffmpeg_assembly_configuration("arm64-v8a") == ()
     assert android_port.ffmpeg_assembly_configuration("x86_64") == (
-        "--disable-x86asm", "--disable-inline-asm"
+        "--disable-x86asm",
+        "--disable-inline-asm",
     )
     assert "api=26" in android_port.ffmpeg_contract(contract)
-    assert android_port.ffmpeg_contract(contract).splitlines()[-1] == "api=26"
+    assert "--enable-demuxer=mpegps,asf" in android_port.ffmpeg_contract(contract)
+    assert (
+        "mpeg1video,adpcm_adx,wmav1,wmav2,wmapro,wmavoice"
+        in android_port.ffmpeg_contract(contract)
+    )
+    assert "-G" in configure and configure[configure.index("-G") + 1] == "Ninja"
+    assert "lib/libSDL3_ttf.a" in android_port.dependency_files(("text",))
+    assert "lib/libbz2.a" in android_port.dependency_files(("bzip2",))
     assert android_port.ffmpeg_required_files(contract.prefix)[0] == Path(
         "/work/prefix/include/libavutil/avutil.h"
     )
-    members = [tarfile.TarInfo("FFmpeg-n7.1.1"), tarfile.TarInfo("FFmpeg-n7.1.1/configure")]
+    members = [
+        tarfile.TarInfo("FFmpeg-n7.1.1"),
+        tarfile.TarInfo("FFmpeg-n7.1.1/configure"),
+    ]
     assert android_port.ffmpeg_archive_root(members) == "FFmpeg-n7.1.1"
     try:
         android_port.ffmpeg_archive_root([*members, tarfile.TarInfo("elsewhere/x")])
@@ -77,10 +100,17 @@ def main() -> int:
         cxx_shared.parent.mkdir(parents=True)
         cxx_shared.touch()
         assert android_port.ndk_cxx_shared_library(ndk, "arm64-v8a") == cxx_shared
-    assert android_port.removable_emulator_test_directory(
-        "/sdcard/Download/benefactor-emulator-test"
-    ) == "/sdcard/Download/benefactor-emulator-test"
-    for path in ("/sdcard/Download", "/sdcard/Download/nested/emulator-test", "/sdcard/Documents/test-emulator-test"):
+    assert (
+        android_port.removable_emulator_test_directory(
+            "/sdcard/Download/benefactor-emulator-test"
+        )
+        == "/sdcard/Download/benefactor-emulator-test"
+    )
+    for path in (
+        "/sdcard/Download",
+        "/sdcard/Download/nested/emulator-test",
+        "/sdcard/Documents/test-emulator-test",
+    ):
         try:
             android_port.removable_emulator_test_directory(path)
         except SystemExit:
@@ -178,7 +208,10 @@ def main() -> int:
             ("libc++_shared.so", cxx_runtime),
         )
         invalid_profile = json.loads(profile_path.read_text(encoding="utf-8"))
-        invalid_profile["nativeDependencies"]["capabilities"] = ["sdl3", "invented-codec"]
+        invalid_profile["nativeDependencies"]["capabilities"] = [
+            "sdl3",
+            "invented-codec",
+        ]
         profile_path.write_text(json.dumps(invalid_profile), encoding="utf-8")
         try:
             android_port.load_android_port_profile(profile_path)
@@ -204,7 +237,64 @@ def main() -> int:
             assert "platform='android-34', expected 'android-26'" in str(error)
         else:
             raise AssertionError("profile accepted a prefix built for another API")
-    print("android-port: shared AVD contract passed")
+    with temporary_directory() as temporary:
+        apk = Path(temporary) / "app.apk"
+        entries = (
+            "lib/arm64-v8a/libmain.so",
+            "lib/arm64-v8a/libSDL3.so",
+            "lib/arm64-v8a/libc++_shared.so",
+            "resources.arsc",
+        )
+        with zipfile.ZipFile(apk, "w") as archive:
+            for name in entries:
+                archive.writestr(name, "synthetic")
+        assert android_port.inspect_apk_runtime(apk, "arm64-v8a") == entries
+        try:
+            android_port.inspect_apk_runtime(apk, "x86_64")
+        except SystemExit as error:
+            assert "lib/x86_64/libmain.so" in str(error)
+        else:
+            raise AssertionError("APK inspection accepted the wrong ABI")
+        with zipfile.ZipFile(apk, "w") as archive:
+            archive.writestr("resources.arsc", "synthetic")
+        try:
+            android_port.inspect_apk_runtime(apk, "arm64-v8a")
+        except SystemExit as error:
+            assert "libmain.so" in str(error)
+        else:
+            raise AssertionError("APK inspection accepted missing native libraries")
+    with temporary_directory() as temporary:
+        from android_package import verify_native_entry
+
+        root = Path(temporary)
+        library = root / "libmain.so"
+        library.touch()
+        readelf = root / "ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+        readelf.parent.mkdir(parents=True)
+        readelf.touch()
+        cases = (
+            ("1: 00001234 32 FUNC GLOBAL DEFAULT 9 main", True),
+            ("1: 00001234 32 FUNC WEAK PROTECTED 9 main", True),
+            ("1: 00000000 0 NOTYPE GLOBAL DEFAULT UND main", False),
+            ("1: 00001234 32 FUNC GLOBAL HIDDEN 9 main", False),
+            ("1: 00001234 32 OBJECT GLOBAL DEFAULT 9 main", False),
+            ("1: 00001234 32 FUNC GLOBAL DEFAULT 9 unrelated", False),
+            ("no symbol table", False),
+        )
+        for output, accepted in cases:
+            with patch(
+                "android_package.subprocess.run",
+                return_value=SimpleNamespace(stdout=output),
+            ) as run:
+                refused = False
+                try:
+                    verify_native_entry(library, root / "ndk")
+                except SystemExit as error:
+                    refused = True
+                    assert "does not export a defined visible" in str(error)
+                assert refused != accepted, output
+                assert "--wide" in run.call_args.args[0]
+    print("android-port: shared prefix, package, Java and AVD contracts passed")
     return 0
 
 

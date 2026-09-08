@@ -6,5 +6,7 @@
   "sdl3ImageRevision": "@ANDROID_PORT_SDL3_IMAGE_REVISION@",
   "freetypeRevision": "@ANDROID_PORT_FREETYPE_REVISION@",
   "fmtRevision": "@ANDROID_PORT_FMT_REVISION@",
+  "sdl3TtfRevision": "@ANDROID_PORT_SDL3_TTF_REVISION@",
+  "bzip2Revision": "@ANDROID_PORT_BZIP2_REVISION@",
   "sdl3Java": "share/android-port/sdl3-java"
 }
