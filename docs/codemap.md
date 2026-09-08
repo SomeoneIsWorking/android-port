@@ -3,6 +3,7 @@
 | Responsibility | Owner | Public entry |
 | --- | --- | --- |
 | CLI, package profiles, shared emulator locking | `tools/android_port.py` | `main`, `load_android_port_profile`, `with_profile_emulator_lock` |
+| Cross-architecture Cuttlefish container lifetime and scoped device access | `tools/android_emulator.py` | `main`; [provisioning contract](android-emulator.md) |
 | Prefix ABI/API, paths, capability inventory | `tools/android_native_contract.py` | `NativeDependencyRequest`, `DEPENDENCY_CAPABILITY_FILES` |
 | Native dependency builds and prefix metadata | `tools/android_native_dependencies.py`, `android_port/native_deps/` | `build_native_dependencies` |
 | FFmpeg source identity, features, cross compilation, cache validity | `tools/android_media.py` | `ffmpeg_build`, `ffmpeg_contract` |
