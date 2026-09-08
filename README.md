@@ -7,10 +7,19 @@ touch contacts). A game owns its package identity, native entry point, game-file
 actions/layout, UI art, and release evidence. This repository owns the build/packaging seam between
 them: pinned Gradle/NDK contract validation, the common cross-compiled native
 dependency prefix, native-artifact staging, APK inspection, and the common Android
-Virtual Device policy. The prefix holds the pinned SDL3, SDL3_image, FreeType,
-fmt, and minimal static FFmpeg set required by native ports; its manifest records
+Virtual Device policy. The prefix holds the pinned SDL3, SDL3_image, SDL3_ttf, FreeType,
+fmt, bzip2, and minimal static FFmpeg set required by native ports; its manifest records
 the ABI/API and FFmpeg configuration so a title never combines host libraries with
-Android artifacts.
+Android artifacts. FFmpeg retains MPEG-PS/MPEG-1/ADX and includes ASF with
+WMA1/WMA2/WMA Pro/WMA Voice; this feature list participates in the cache contract.
+`text` selects SDL3_ttf and `bzip2` selects the bounded-installer dependency.
+
+Native-prefix mechanics live in `tools/android_native_dependencies.py`, shared
+input contracts in `android_native_contract.py`, media builds in `android_media.py`,
+JDK selection in `android_java.py`, and Gradle/runtime staging and APK inspection in
+`android_package.py`. The CLI remains the public package/profile/device interface.
+The prefix also publishes SDL's pinned Gradle wrapper launcher/JAR; consuming titles
+retain their version/checksum properties and Gradle project policy.
 
 Every package with native C++ code stages the prefix's
 `share/android-port/cxx/<abi>/libc++_shared.so` as
