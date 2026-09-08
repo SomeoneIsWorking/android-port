@@ -2,3 +2,4 @@
 build/
 scratch/
 __pycache__/
+coord/android-emulator.lock
