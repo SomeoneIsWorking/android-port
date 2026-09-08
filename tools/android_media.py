@@ -35,6 +35,7 @@ def ffmpeg_contract(request: NativeDependencyRequest) -> str:
             f"ffmpeg={FFMPEG_VERSION}",
             f"abi={request.abi}",
             f"api={request.api}",
+            "pic=enabled",
             *ffmpeg_assembly_configuration(request.abi),
             *FFMPEG_FEATURES,
             "",
