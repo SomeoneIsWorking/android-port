@@ -123,7 +123,7 @@ ExternalProject_Add(sdl3_ttf
 ExternalProject_Add(bzip2
   PREFIX "${CMAKE_BINARY_DIR}/bzip2"
   SOURCE_DIR "${CMAKE_BINARY_DIR}/sources/bzip2"
-  GIT_REPOSITORY https://sourceware.org/git/bzip2.git
+  GIT_REPOSITORY https://gitlab.com/bzip2/bzip2.git
   GIT_TAG ${ANDROID_PORT_BZIP2_REVISION}
   GIT_SHALLOW TRUE
   CONFIGURE_COMMAND ${CMAKE_COMMAND}
