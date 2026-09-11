@@ -62,7 +62,11 @@ def main() -> int:
     assert android_port.native_dependency_cxx_runtime(contract) == Path(
         "/work/prefix/share/android-port/cxx/arm64-v8a/libc++_shared.so"
     )
-    assert android_port.ffmpeg_assembly_configuration("arm64-v8a") == ("--disable-asm",)
+    # arm64 keeps its NEON: hidden visibility, not disabled assembly, is what
+    # makes the ff_tx_tab_* relocations legal in a PIE shared object.
+    assert android_port.ffmpeg_assembly_configuration("arm64-v8a") == ()
+    assert "-fvisibility=hidden" in android_port.FFMPEG_CFLAGS
+    assert "cflags=-fPIC -fvisibility=hidden" in android_port.ffmpeg_contract(contract)
     assert android_port.ffmpeg_assembly_configuration("x86_64") == (
         "--disable-x86asm",
         "--disable-inline-asm",

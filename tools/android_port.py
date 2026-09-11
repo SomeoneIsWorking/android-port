@@ -21,6 +21,7 @@ from android_java import (
 )
 from android_media import (
     ffmpeg_archive_root,
+    FFMPEG_CFLAGS,
     ffmpeg_assembly_configuration,
     ffmpeg_contract,
     ffmpeg_required_files,
@@ -56,6 +57,7 @@ __all__ = [
     "NativeDependencyRequest",
     "build_native_dependencies",
     "ffmpeg_archive_root",
+    "FFMPEG_CFLAGS",
     "ffmpeg_assembly_configuration",
     "ffmpeg_contract",
     "ffmpeg_required_files",

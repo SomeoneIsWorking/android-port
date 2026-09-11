@@ -23,15 +23,24 @@ FFMPEG_FEATURES = (
 )
 
 
+# Every symbol FFmpeg defines is internal to the consuming shared library: a
+# port links these archives into its own libmain.so and re-exports none of
+# them.  Hiding them is what makes the AArch64 assembly linkable at all.
+# FFmpeg 7.1.1's transform code reaches its ff_tx_tab_* tables with adrp+add,
+# which a PIE shared object can only relocate against a symbol that cannot be
+# preempted; with default visibility the link fails with
+# "R_AARCH64_ADR_PREL_PG_HI21 cannot be used against symbol ff_tx_tab_32_float".
+# Disabling the assembly instead also works and costs every NEON path in the
+# library -- measured on an ARM64 Android port, the scalar yuv2rgb and IDCT
+# fallbacks were 13.7% of its samples during video playback.
+FFMPEG_CFLAGS = ("-fPIC", "-fvisibility=hidden")
+
+
 def ffmpeg_assembly_configuration(abi: str) -> tuple[str, ...]:
     """Keep emulator FFmpeg independent of a host NASM installation."""
     if abi == "x86_64":
         return ("--disable-x86asm", "--disable-inline-asm")
-    # FFmpeg 7.1.1's AArch64 transform objects contain absolute table
-    # relocations; they cannot be linked into Android's PIE shared library even
-    # when --enable-pic and -fPIC are enabled.  The portable C transforms retain
-    # the complete decoder contract and are the only safe Android ARM64 input.
-    return ("--disable-asm",)
+    return ()
 
 
 def ffmpeg_contract(request: NativeDependencyRequest) -> str:
@@ -42,6 +51,7 @@ def ffmpeg_contract(request: NativeDependencyRequest) -> str:
             f"abi={request.abi}",
             f"api={request.api}",
             "pic=enabled",
+            f"cflags={' '.join(FFMPEG_CFLAGS)}",
             *ffmpeg_assembly_configuration(request.abi),
             *FFMPEG_FEATURES,
             "",
@@ -199,7 +209,7 @@ def ffmpeg_build(request: NativeDependencyRequest, jobs: int) -> None:
         "--disable-libdrm",
         "--disable-appkit",
         "--pkg-config=/bin/false",
-        "--extra-cflags=-fPIC",
+        f"--extra-cflags={' '.join(FFMPEG_CFLAGS)}",
         "--extra-ldflags=-fPIC",
         "--extra-version=android-port",
         *ffmpeg_assembly_configuration(request.abi),
