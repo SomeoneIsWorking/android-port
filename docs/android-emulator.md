@@ -93,6 +93,17 @@ disabled is sufficient for local ADB/package tests. The examined upstream
 configuration; selecting `slirp` then produces QEMU's invalid `net=/255` argument.
 Do not claim network coverage from this configuration.
 
+Dismiss the keyguard before launching a windowed app: `adb -s 127.0.0.1:6520
+shell wm dismiss-keyguard`. While the lock screen or notification shade holds
+focus -- `dumpsys window | grep mCurrentFocus` reports `NotificationShade`, not
+the launcher -- a launched Activity is resumed and focused by
+`dumpsys activity activities` yet never receives a surface. SDL reports
+`surfaceDestroyed()`/`nativePause()` about a second after the native main
+starts, and a game thread that then calls `SDL_CreateWindow` blocks in
+`pipe_read` forever. That failure looks exactly like a hung guest: liveness,
+boot property and ADB all stay healthy, so check window focus before
+diagnosing the app.
+
 Before installing an APK, require `adb -s 127.0.0.1:6520 shell getprop
 sys.boot_completed` to return `1`. Read live guest logcat at
 `build/cuttlefish/runtime/instances/cvd-1/logs/logcat` to distinguish advancing
