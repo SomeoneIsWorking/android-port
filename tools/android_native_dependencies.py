@@ -117,6 +117,14 @@ def stage_native_dependency_metadata(
         request.prefix / "share" / "android-port" / "sdl3-java",
         dirs_exist_ok=True,
     )
+    framework_source = ROOT / "android_port" / "java"
+    if not framework_source.is_dir():
+        raise SystemExit(f"Android framework Java sources are missing: {framework_source}")
+    shutil.copytree(
+        framework_source,
+        request.prefix / "share" / "android-port" / "framework-java",
+        dirs_exist_ok=True,
+    )
     android_project = java_source.parents[3]
     wrapper = request.prefix / "share/android-port/gradle-wrapper"
     for relative in ("gradlew", "gradlew.bat", "gradle/wrapper/gradle-wrapper.jar"):
