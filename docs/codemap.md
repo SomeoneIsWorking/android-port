@@ -9,7 +9,7 @@
 | FFmpeg source identity, features, cross compilation, cache validity | `tools/android_media.py` | `ffmpeg_build`, `ffmpeg_contract` |
 | Coherent host JDK selection | `tools/android_java.py` | `select_java_home` |
 | Gradle runtime source staging, NDK ELF inspection, APK runtime inventory | `tools/android_package.py` | `stage_gradle_runtime`, `verify_native_entry`, `inspect_apk_runtime` |
-| Android application framework: Activity shell, SAF import, notification and contact lifetimes | `android_port/java/io/github/someoneisworking/android/` | `AndroidActivity`, `AndroidDocumentImport`, `AndroidTouchContacts` |
+| Android application framework: Activity shell, SAF import, verified resume prefix, notification and contact lifetimes | `android_port/java/io/github/someoneisworking/android/` | `AndroidActivity`, `AndroidDocumentImport`, `AndroidImportResume`, `AndroidTouchContacts` |
 | Platform-free Android framework contract tests | `tests/java/io/github/someoneisworking/android/`, `tests/test_android_java.py` | `test_android_java.py` |
 
 Titles own application identity, Gradle project/version selection, install validation,

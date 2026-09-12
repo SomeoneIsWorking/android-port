@@ -146,6 +146,13 @@ notifications. Consumers provide title identity validation, package identity,
 and their UI wording. Lucent may be pinned for logging, configuration, or focused
 helpers; it does not own the Android application framework.
 
+A resumed document copy compares its staged prefix with the reopened SAF source
+before appending. If the provider changed the document at the same URI, the
+framework discards that partial copy and refuses the attempt; the next selection
+starts clean.
+Android removes package-specific OBB storage on uninstall. Consumers that need
+files across uninstall must use a separate user-selected shared-storage contract.
+
 Run the platform-free Java contracts with a JDK capable of targeting Java 17:
 
 ```sh
