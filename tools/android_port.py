@@ -20,8 +20,8 @@ from android_java import (
     select_java_home,
 )
 from android_media import (
-    ffmpeg_archive_root,
     FFMPEG_CFLAGS,
+    ffmpeg_archive_root,
     ffmpeg_assembly_configuration,
     ffmpeg_contract,
     ffmpeg_required_files,
@@ -45,19 +45,20 @@ from android_native_dependencies import (
 from android_package import (
     inspect_apk_runtime,
     stage_gradle_runtime,
+    verify_apk_signature,
     verify_native_entry,
 )
 
 __all__ = [
     "DEFAULT_ANDROID_API",
     "DEPENDENCY_CAPABILITY_FILES",
+    "FFMPEG_CFLAGS",
     "NATIVE_DEPENDENCY_FILES",
     "NATIVE_DEPS_SOURCE",
     "NDK_TRIPLES",
     "NativeDependencyRequest",
     "build_native_dependencies",
     "ffmpeg_archive_root",
-    "FFMPEG_CFLAGS",
     "ffmpeg_assembly_configuration",
     "ffmpeg_contract",
     "ffmpeg_required_files",
@@ -69,6 +70,7 @@ __all__ = [
     "ndk_cxx_shared_library",
     "select_java_home",
     "stage_gradle_runtime",
+    "verify_apk_signature",
     "verify_native_entry",
 ]
 

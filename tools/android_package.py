@@ -1,5 +1,6 @@
 """Shared Gradle runtime sources, ELF entry validation, and APK runtime inspection."""
 
+import re
 import shutil
 import subprocess
 import zipfile
@@ -71,3 +72,42 @@ def inspect_apk_runtime(apk: Path, abi: str) -> tuple[str, ...]:
     if missing:
         raise SystemExit("APK is missing runtime artifacts: " + ", ".join(missing))
     return entries
+
+
+def verify_apk_signature(
+    apk: Path, sdk: Path, build_tools_version: str, min_api: int
+) -> str:
+    """Verify the shipped APK on its API floor and return its sole signer digest."""
+    if not apk.is_file():
+        raise SystemExit(f"APK is missing: {apk}")
+    executable = sdk / "build-tools" / build_tools_version / "apksigner"
+    if not executable.is_file():
+        raise SystemExit(f"Android SDK apksigner is missing: {executable}")
+    result = subprocess.run(
+        [
+            str(executable),
+            "verify",
+            "--min-sdk-version",
+            str(min_api),
+            "--verbose",
+            "--print-certs",
+            str(apk),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"APK signature verification failed: {(result.stderr or result.stdout).strip()[:300]}"
+        )
+    fingerprints = re.findall(
+        r"^Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]{64})$",
+        result.stdout,
+        flags=re.MULTILINE,
+    )
+    if len(fingerprints) != 1:
+        raise SystemExit(
+            f"APK must have exactly one reported signer SHA-256 digest; found {len(fingerprints)}"
+        )
+    return fingerprints[0].upper()
