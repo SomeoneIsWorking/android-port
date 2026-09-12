@@ -88,9 +88,9 @@ public final class AndroidDocumentImport {
        cadence leaves headroom for provider and lifecycle traffic while keeping the import visibly
        alive. */
     private static final long PROGRESS_INTERVAL_MILLIS = 500;
-    private static final String STAGING_PREFIX = "lucent-import-";
-    private static final String PREVIOUS_PREFIX = ".lucent-previous-";
-    private static final String SOURCE_MARKER = ".lucent-source";
+    private static final String STAGING_PREFIX = "android-import-";
+    private static final String PREVIOUS_PREFIX = ".android-previous-";
+    private static final String SOURCE_MARKER = ".android-source";
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final Activity activity;
@@ -199,7 +199,7 @@ public final class AndroidDocumentImport {
         }
         workerActive = true;
         boolean isTree = request.tree();
-        worker = new Thread(() -> importSelection(source, isTree), "lucent-document-import");
+        worker = new Thread(() -> importSelection(source, isTree), "android-document-import");
         worker.start();
         return true;
     }
@@ -280,7 +280,7 @@ public final class AndroidDocumentImport {
         File staging = result.stagingDirectory.getCanonicalFile();
         if (!staging.getParentFile().equals(root) || !staging.getName().startsWith(STAGING_PREFIX)
                 || !staging.isDirectory()) {
-            throw new IOException("import staging is not a Android private directory");
+            throw new IOException("import staging is not an Android private directory");
         }
         if (!AndroidImportPromotion.remove(staging)) {
             throw new IOException("cannot discard rejected import staging");
@@ -431,7 +431,7 @@ public final class AndroidDocumentImport {
         File staging = result.stagingDirectory.getCanonicalFile();
         if (!staging.getParentFile().equals(root) || !staging.getName().startsWith(STAGING_PREFIX)
                 || !staging.isDirectory()) {
-            throw new IOException("import staging is not a Android private directory");
+            throw new IOException("import staging is not an Android private directory");
         }
         return staging;
     }
