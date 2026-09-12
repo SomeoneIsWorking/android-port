@@ -136,3 +136,11 @@ uv run --frozen python tools/android_port.py with-profile-emulator-lock \
 ```
 
 The command rejects a different ADB serial before it acquires the lock.
+
+## Android application framework
+
+`android_port/java/io/github/someoneisworking/android` is the shared Android
+application framework. It owns Activity lifecycle helpers, SAF ZIP import,
+persistent OBB-backed staging, resumable copies, and determinate import
+notifications. Consumers provide title identity validation, package identity,
+and their UI wording; Lucent is not an Android framework dependency.
