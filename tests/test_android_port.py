@@ -268,6 +268,50 @@ def main() -> int:
         else:
             raise AssertionError("APK inspection accepted missing native libraries")
     with temporary_directory() as temporary:
+        root = Path(temporary)
+        apk = root / "app.apk"
+        apk.touch()
+        signer = root / "sdk/build-tools/35.0.0/apksigner"
+        signer.parent.mkdir(parents=True)
+        signer.touch()
+        digest = "A1" * 32
+        with patch(
+            "android_package.subprocess.run",
+            return_value=SimpleNamespace(
+                returncode=0,
+                stdout=f"Verifies\nSigner #1 certificate SHA-256 digest: {digest}\n",
+                stderr="",
+            ),
+        ) as execution:
+            assert (
+                android_port.verify_apk_signature(apk, root / "sdk", "35.0.0", 21)
+                == digest
+            )
+            command = execution.call_args.args[0]
+            assert command[:4] == [str(signer), "verify", "--min-sdk-version", "21"]
+            assert "--print-certs" in command
+        for result in (
+            SimpleNamespace(returncode=1, stdout="invalid signature", stderr=""),
+            SimpleNamespace(returncode=0, stdout="Verifies\n", stderr=""),
+            SimpleNamespace(
+                returncode=0,
+                stdout=(
+                    f"Signer #1 certificate SHA-256 digest: {digest}\n"
+                    f"Signer #2 certificate SHA-256 digest: {digest}\n"
+                ),
+                stderr="",
+            ),
+        ):
+            with patch("android_package.subprocess.run", return_value=result):
+                try:
+                    android_port.verify_apk_signature(apk, root / "sdk", "35.0.0", 21)
+                except SystemExit:
+                    pass
+                else:
+                    raise AssertionError(
+                        "APK signature check accepted an invalid result"
+                    )
+    with temporary_directory() as temporary:
         from android_package import verify_native_entry
 
         root = Path(temporary)
@@ -316,14 +360,16 @@ def main() -> int:
         except SystemExit as error:
             assert "framework-java" in str(error)
         else:
-            raise AssertionError("staging accepted a prefix without Android framework Java")
+            raise AssertionError(
+                "staging accepted a prefix without Android framework Java"
+            )
         assert not (project / "app/src/main/java").exists()
         framework.parent.mkdir(parents=True)
         framework.write_text("AndroidActivity", encoding="utf-8")
         android_port.stage_gradle_runtime(prefix, project)
-        assert (project / "app/src/main/java/org/libsdl/app/SDLActivity.java").read_text(
-            encoding="utf-8"
-        ) == "SDLActivity.java"
+        assert (
+            project / "app/src/main/java/org/libsdl/app/SDLActivity.java"
+        ).read_text(encoding="utf-8") == "SDLActivity.java"
         assert (
             project
             / "app/src/main/java/io/github/someoneisworking/android/AndroidActivity.java"
