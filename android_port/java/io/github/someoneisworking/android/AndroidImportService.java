@@ -9,8 +9,8 @@ import android.os.IBinder;
 
 /** Non-exported dataSync service used only by AndroidImportNotification. */
 public final class AndroidImportService extends Service {
-    static final String NOTIFICATION_ID = "lucent.import.notificationId";
-    static final String NOTIFICATION = "lucent.import.notification";
+    static final String NOTIFICATION_ID = "android-port.import.notificationId";
+    static final String NOTIFICATION = "android-port.import.notification";
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
