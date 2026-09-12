@@ -12,21 +12,21 @@ import android.os.Build;
  * Updates and repeated stop calls never start a service, including after the Activity finishes.
  * This owns foreground lifetime, not the import worker or title validation.
  */
-public final class LucentImportNotification {
-    private final LucentImportLifetime<Notification> lifetime;
+public final class AndroidImportNotification {
+    private final AndroidImportLifetime<Notification> lifetime;
 
-    public LucentImportNotification(Context context, int notificationId) {
+    public AndroidImportNotification(Context context, int notificationId) {
         if (notificationId <= 0) throw new IllegalArgumentException("notification ID must be positive");
         Context app = context.getApplicationContext();
         NotificationManager manager =
                 (NotificationManager) app.getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager == null) throw new IllegalStateException("Android notification service is missing");
-        lifetime = new LucentImportLifetime<>(new LucentImportLifetime.Host<Notification>() {
+        lifetime = new AndroidImportLifetime<>(new AndroidImportLifetime.Host<Notification>() {
             @Override
             public void start(Notification progress) {
-                Intent intent = new Intent(app, LucentImportService.class);
-                intent.putExtra(LucentImportService.NOTIFICATION_ID, notificationId);
-                intent.putExtra(LucentImportService.NOTIFICATION, progress);
+                Intent intent = new Intent(app, AndroidImportService.class);
+                intent.putExtra(AndroidImportService.NOTIFICATION_ID, notificationId);
+                intent.putExtra(AndroidImportService.NOTIFICATION, progress);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     app.startForegroundService(intent);
                 } else {
@@ -41,7 +41,7 @@ public final class LucentImportNotification {
 
             @Override
             public void stop() {
-                app.stopService(new Intent(app, LucentImportService.class));
+                app.stopService(new Intent(app, AndroidImportService.class));
                 manager.cancel(notificationId);
             }
         });

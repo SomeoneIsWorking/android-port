@@ -1,7 +1,7 @@
 package io.github.someoneisworking.android;
 
 /** Main-thread lifetime of one foreground import, independent of Android transport. */
-final class LucentImportLifetime<T> {
+final class AndroidImportLifetime<T> {
     interface Host<T> {
         void start(T progress);
         void update(T progress);
@@ -11,7 +11,7 @@ final class LucentImportLifetime<T> {
     private final Host<T> host;
     private boolean active;
 
-    LucentImportLifetime(Host<T> host) {
+    AndroidImportLifetime(Host<T> host) {
         this.host = host;
     }
 

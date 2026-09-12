@@ -10,20 +10,20 @@ import android.content.Intent;
 import android.os.Build;
 
 /** Persistent import progress presentation; titles provide identity, wording and tap destination. */
-public final class LucentImportProgress {
+public final class AndroidImportProgress {
     private final Context context;
     private final String channelId;
     private final String title;
     private final Class<? extends Activity> destination;
-    private final LucentImportNotification notification;
+    private final AndroidImportNotification notification;
 
-    public LucentImportProgress(Context context, int notificationId, String channelId,
+    public AndroidImportProgress(Context context, int notificationId, String channelId,
                                 String channelName, String title, Class<? extends Activity> destination) {
         this.context = context.getApplicationContext();
         this.channelId = channelId;
         this.title = title;
         this.destination = destination;
-        notification = new LucentImportNotification(context, notificationId);
+        notification = new AndroidImportNotification(context, notificationId);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager manager =
                     (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);

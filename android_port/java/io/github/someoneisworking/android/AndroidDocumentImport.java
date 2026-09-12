@@ -25,10 +25,10 @@ import java.util.Set;
  *
  * <p>This class owns persisted URI grants, exactly one picker/import at a time, bounded background
  * copying to app-private staging, and cancellation. A title decides which picker to show, validates
- * its own files, and publishes a validated result; Lucent never guesses a document's filesystem path
+ * its own files, and publishes a validated result; Android never guesses a document's filesystem path
  * or knows a game's media format.</p>
  */
-public final class LucentDocumentImport {
+public final class AndroidDocumentImport {
     public static final class Limits {
         public final int maximumEntries;
         public final long maximumBytes;
@@ -68,7 +68,7 @@ public final class LucentDocumentImport {
      * <p>A whole game installation over SAF is gigabytes and minutes, and the
      * copy owns the screen for all of it. Without this the consumer has
      * nothing true to say and shows a still screen, which reads as a hung
-     * app. Lucent reports what it has copied; the words stay with the
+     * app. Android reports what it has copied; the words stay with the
      * consumer.</p>
      *
      * <p>Delivered on the Activity's main thread, at most every 500 ms. For a
@@ -96,19 +96,19 @@ public final class LucentDocumentImport {
     private final Activity activity;
     private final File storageRoot;
     private final Limits limits;
-    private final LucentImportRequest<Callback> request = new LucentImportRequest<>();
+    private final AndroidImportRequest<Callback> request = new AndroidImportRequest<>();
     private boolean workerActive;
     private Thread worker;
     private ProgressListener progressListener;
     /* Worker-thread only: the copy is the sole writer. */
     private long lastProgressMillis;
 
-    public LucentDocumentImport(Activity activity, Limits limits) {
+    public AndroidDocumentImport(Activity activity, Limits limits) {
         this(activity, activity == null ? null : activity.getFilesDir(), limits);
     }
 
     /** Uses a caller-owned persistent root, such as Android's package OBB directory. */
-    public LucentDocumentImport(Activity activity, File storageRoot, Limits limits) {
+    public AndroidDocumentImport(Activity activity, File storageRoot, Limits limits) {
         if (activity == null || storageRoot == null || limits == null) {
             throw new IllegalArgumentException("activity, storage root and limits are required");
         }
@@ -128,7 +128,7 @@ public final class LucentDocumentImport {
 
     /** Save while the external picker is open, including Activity process recreation. */
     public synchronized Bundle savePickerState() {
-        LucentImportRequest.Snapshot pending = request.snapshot();
+        AndroidImportRequest.Snapshot pending = request.snapshot();
         if (pending == null) return null;
         Bundle state = new Bundle();
         state.putInt("requestCode", pending.code);
@@ -143,7 +143,7 @@ public final class LucentDocumentImport {
         if (!state.containsKey("requestCode") || !state.containsKey("tree")) {
             throw new IllegalArgumentException("incomplete picker state");
         }
-        request.restore(new LucentImportRequest.Snapshot(
+        request.restore(new AndroidImportRequest.Snapshot(
                 state.getInt("requestCode"), state.getBoolean("tree")), callback);
         return true;
     }
@@ -227,7 +227,7 @@ public final class LucentDocumentImport {
         for (File candidate : candidates) {
             if (candidate.getName().startsWith(STAGING_PREFIX)) {
                 if (!new File(candidate, SOURCE_MARKER).isFile()) {
-                    LucentImportPromotion.remove(candidate);
+                    AndroidImportPromotion.remove(candidate);
                 }
             } else if (candidate.getName().startsWith(PREVIOUS_PREFIX)) {
                 recoverPreviousSelection(candidate);
@@ -259,14 +259,14 @@ public final class LucentDocumentImport {
         }
         File destination = privateChild(root, destinationName);
         File previous = privateChild(root, PREVIOUS_PREFIX + destinationName);
-        return LucentImportPromotion.publish(staging, selectedDirectory, destination, previous);
+        return AndroidImportPromotion.publish(staging, selectedDirectory, destination, previous);
     }
 
     /**
      * Discards a completed import that the title declined to validate.
      *
      * <p>A title calls this after its own identity or complete-install check fails. It accepts only
-     * a still-private Lucent staging directory, so a rejected document can never delete the current
+     * a still-private Android staging directory, so a rejected document can never delete the current
      * validated installation or an arbitrary app-private path.</p>
      */
     public synchronized void discard(Result result) throws IOException {
@@ -280,9 +280,9 @@ public final class LucentDocumentImport {
         File staging = result.stagingDirectory.getCanonicalFile();
         if (!staging.getParentFile().equals(root) || !staging.getName().startsWith(STAGING_PREFIX)
                 || !staging.isDirectory()) {
-            throw new IOException("import staging is not a Lucent private directory");
+            throw new IOException("import staging is not a Android private directory");
         }
-        if (!LucentImportPromotion.remove(staging)) {
+        if (!AndroidImportPromotion.remove(staging)) {
             throw new IOException("cannot discard rejected import staging");
         }
     }
@@ -292,7 +292,7 @@ public final class LucentDocumentImport {
      *
      * <p>This is for archive importers that have already extracted and validated their retained
      * content under the same staging directory. It frees the archive before promotion without
-     * weakening Lucent's all-or-nothing directory publication. Trees have no one source document
+     * weakening Android's all-or-nothing directory publication. Trees have no one source document
      * and cannot use this operation.</p>
      */
     public synchronized void discardValidatedDocument(Result result) throws IOException {
@@ -340,7 +340,7 @@ public final class LucentDocumentImport {
             String completedName = documentName;
             activity.runOnUiThread(() -> finishSuccess(new Result(completedStaging, completedName, isTree)));
         } catch (IOException | RuntimeException error) {
-            // Android document providers are outside Lucent's control. Keep a
+            // Android document providers are outside Android's control. Keep a
             // staged archive and its source marker so the next selection can
             // resume from its current length; the title discards rejected input.
             String detail = error.getMessage();
@@ -399,7 +399,7 @@ public final class LucentDocumentImport {
                 writer.write(source.toString());
             }
         } catch (IOException error) {
-            LucentImportPromotion.remove(staging);
+            AndroidImportPromotion.remove(staging);
             throw error;
         }
         return staging;
@@ -431,7 +431,7 @@ public final class LucentDocumentImport {
         File staging = result.stagingDirectory.getCanonicalFile();
         if (!staging.getParentFile().equals(root) || !staging.getName().startsWith(STAGING_PREFIX)
                 || !staging.isDirectory()) {
-            throw new IOException("import staging is not a Lucent private directory");
+            throw new IOException("import staging is not a Android private directory");
         }
         return staging;
     }
@@ -443,14 +443,14 @@ public final class LucentDocumentImport {
             File root = storageRoot.getCanonicalFile();
             File destination = privateChild(root, destinationName);
             if (destination.exists()) {
-                if (!LucentImportPromotion.remove(previous)) {
+                if (!AndroidImportPromotion.remove(previous)) {
                     throw new IOException("cannot retire an interrupted previous selection");
                 }
             } else if (!previous.renameTo(destination)) {
                 throw new IOException("cannot restore an interrupted previous selection");
             }
         } catch (IOException error) {
-            throw new IllegalStateException("cannot recover interrupted Lucent import promotion", error);
+            throw new IllegalStateException("cannot recover interrupted Android import promotion", error);
         }
     }
 
@@ -584,7 +584,7 @@ public final class LucentDocumentImport {
 
     private synchronized void finishSuccess(Result result) {
         if (!workerActive) {
-            LucentImportPromotion.remove(result.stagingDirectory);
+            AndroidImportPromotion.remove(result.stagingDirectory);
             return;
         }
         Callback completed = clearCallback();

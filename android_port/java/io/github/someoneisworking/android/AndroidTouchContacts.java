@@ -11,7 +11,7 @@ import java.util.Map;
  * resulting contacts into its own controls. The listener receives immutable snapshots only for the
  * duration of the callback, so a title cannot retain Android's recycled {@code MotionEvent}.</p>
  */
-public final class LucentTouchContacts {
+public final class AndroidTouchContacts {
   public enum Phase {
     Down,
     Move,
