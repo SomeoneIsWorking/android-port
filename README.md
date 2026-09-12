@@ -143,4 +143,16 @@ The command rejects a different ADB serial before it acquires the lock.
 application framework. It owns Activity lifecycle helpers, SAF ZIP import,
 persistent OBB-backed staging, resumable copies, and determinate import
 notifications. Consumers provide title identity validation, package identity,
-and their UI wording; Lucent is not an Android framework dependency.
+and their UI wording. Lucent may be pinned for logging, configuration, or focused
+helpers; it does not own the Android application framework.
+
+Run the platform-free Java contracts with a JDK capable of targeting Java 17:
+
+```sh
+uv run --frozen python tests/test_android_java.py
+```
+
+This compiles and runs touch, import lifetime, publication, and picker-request
+tests in `build/java-tests/`; it needs no Android SDK. CI is configured to run
+the same command on Linux, macOS, and Windows with Java 17. Android-dependent
+Activity and SAF behavior is verified through consuming APKs.

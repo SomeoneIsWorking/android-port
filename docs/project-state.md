@@ -25,6 +25,7 @@ package contract on the declared Android ABI/API floor.
 | S004 | Shared emulator lock and serial policy | partial | S002 | — |
 | S005 | Installable APK build and inspection | blocked | No title application exists in this shared repository | — |
 | S006 | Linux/macOS/Windows desktop product | blocked | This repository owns Android build/package plumbing, not a desktop runtime | — |
+| S007 | Shared Android application framework for Activity lifecycle, SAF import, notifications, and raw touch contacts | partial | S001 | — |
 
 ### S001 — Android dependency prefix
 
@@ -72,16 +73,31 @@ build and inspect.
 
 ### S006 — Desktop product
 
-Blocked because this repository is Android packaging/build plumbing, not a
-desktop runtime. Host CI only runs its asset-free Python contract tests;
-native Android compilation runs on Linux with the Android NDK.
+Blocked because this repository owns an Android application framework and
+build/package plumbing, not a desktop runtime. Host CI runs asset-free Python
+and Java contracts; native Android compilation runs on Linux with the Android NDK.
 
 Blocker: no desktop runtime is owned by this repository.
+
+### S007 — Android application framework
+
+The title-neutral Java implementation now lives under `android_port/java/`.
+The four platform-free contracts exercise touch cancellation and listener replacement,
+import lifetime and foreground-start failure, whole/nested publication and refusal,
+and picker request recreation. The test runner compiles them for Java 17 and runs
+them without an Android SDK.
+
+Evidence: `uv run --frozen python tests/test_android_java.py` passes all four
+test classes locally. The CI matrix is configured to run the same command on
+Linux, macOS, and Windows with Java 17. Gap: the Android-dependent Activity,
+SAF transport, notification, and complete package/device path still need compilation and
+runtime verification through a consuming title.
 
 ## Host CI support
 
 `.github/workflows/ci.yml` uses complete-history, read-only checkouts and no game
 assets. The Android job builds the actual pinned native dependency prefix for
-arm64-v8a/API 35; the host job exercises the synthetic profile/staging policy.
+arm64-v8a/API 35; the Linux host job exercises the synthetic profile/staging
+policy, and the Java contract matrix is configured for Linux, macOS, and Windows.
 No desktop or APK-install job is claimed because this repository does not own
 those products.
