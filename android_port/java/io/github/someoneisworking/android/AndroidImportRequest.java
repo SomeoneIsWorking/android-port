@@ -1,7 +1,7 @@
 package io.github.someoneisworking.android;
 
 /** Pending picker identity and callback binding, independent of an Activity instance. */
-public final class LucentImportRequest<C> {
+public final class AndroidImportRequest<C> {
     public static final class Snapshot {
         public final int code;
         public final boolean tree;

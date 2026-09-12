@@ -7,8 +7,8 @@ import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
 
-/** Non-exported dataSync service used only by LucentImportNotification. */
-public final class LucentImportService extends Service {
+/** Non-exported dataSync service used only by AndroidImportNotification. */
+public final class AndroidImportService extends Service {
     static final String NOTIFICATION_ID = "lucent.import.notificationId";
     static final String NOTIFICATION = "lucent.import.notification";
 

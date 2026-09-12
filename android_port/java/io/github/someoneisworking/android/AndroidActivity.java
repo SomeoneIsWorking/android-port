@@ -11,12 +11,12 @@ import android.view.WindowInsetsController;
 import org.libsdl.app.SDLActivity;
 
 /**
- * Base SDLActivity for Lucent-backed SDL3 applications.
+ * Base SDLActivity for Android-backed SDL3 applications.
  *
  * Owns system UI visibility (sticky immersive landscape fullscreen) and graceful task termination.
  */
-public class LucentActivity extends SDLActivity {
-    private final LucentTouchContacts touchContacts = new LucentTouchContacts();
+public class AndroidActivity extends SDLActivity {
+    private final AndroidTouchContacts touchContacts = new AndroidTouchContacts();
 
     /**
      * Installs title-owned contact interpretation without taking over Android or SDL event delivery.
@@ -25,7 +25,7 @@ public class LucentActivity extends SDLActivity {
      * those contacts through the title's normal input policy; it must not return Android event-consumed
      * state or create a second input transport.</p>
      */
-    public final void setRawTouchListener(LucentTouchContacts.Listener listener) {
+    public final void setRawTouchListener(AndroidTouchContacts.Listener listener) {
         touchContacts.setListener(listener);
     }
 

@@ -4,8 +4,8 @@ import java.io.File;
 import java.io.IOException;
 
 /** Filesystem publication of a validated private import, including a selected nested directory. */
-final class LucentImportPromotion {
-    private LucentImportPromotion() {}
+final class AndroidImportPromotion {
+    private AndroidImportPromotion() {}
 
     static File publish(File staging, File selected, File destination, File previous) throws IOException {
         File stage = staging.getCanonicalFile();
