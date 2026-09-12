@@ -340,12 +340,16 @@ public final class AndroidDocumentImport {
             String completedName = documentName;
             activity.runOnUiThread(() -> finishSuccess(new Result(completedStaging, completedName, isTree)));
         } catch (IOException | RuntimeException error) {
-            // Android document providers are outside Android's control. Keep a
-            // staged archive and its source marker so the next selection can
-            // resume from its current length; the title discards rejected input.
+            // Keep an interrupted copy for resume. A changed source cannot
+            // safely use that prefix, so discard the partial transaction.
             String detail = error.getMessage();
-            activity.runOnUiThread(() -> finishFailure(
-                    "Could not import the selected game files" + (detail == null ? "." : ": " + detail)));
+            if (error instanceof AndroidImportResume.SourceChanged && staging != null
+                    && !AndroidImportPromotion.remove(staging)) {
+                detail = "resumable source changed and the partial copy could not be discarded";
+            }
+            final String message = "Could not import the selected game files"
+                    + (detail == null ? "." : ": " + detail);
+            activity.runOnUiThread(() -> finishFailure(message));
         }
     }
 
@@ -504,24 +508,19 @@ public final class AndroidDocumentImport {
             }
             return;
         }
-        try (InputStream input = openFile(source, target.getName());
-             OutputStream output = new FileOutputStream(target, resumeBytes > 0)) {
-            long skipped = 0;
-            while (skipped < resumeBytes) {
-                long step = input.skip(resumeBytes - skipped);
-                if (step <= 0) {
-                    if (input.read() < 0) throw new IOException("resumable source changed");
-                    step = 1;
-                }
-                skipped += step;
+        try (InputStream input = openFile(source, target.getName())) {
+            if (resumeBytes > 0) {
+                AndroidImportResume.verifyPrefix(input, target, resumeBytes, limits.bufferBytes);
             }
-            byte[] buffer = new byte[limits.bufferBytes];
-            for (int count; (count = input.read(buffer)) >= 0; ) {
-                checkCancelled();
-                if (count > 0) {
-                    budget.addBytes(count);
-                    output.write(buffer, 0, count);
-                    noteProgress(target.getName(), budget);
+            try (OutputStream output = new FileOutputStream(target, resumeBytes > 0)) {
+                byte[] buffer = new byte[limits.bufferBytes];
+                for (int count; (count = input.read(buffer)) >= 0; ) {
+                    checkCancelled();
+                    if (count > 0) {
+                        budget.addBytes(count);
+                        output.write(buffer, 0, count);
+                        noteProgress(target.getName(), budget);
+                    }
                 }
             }
         }
