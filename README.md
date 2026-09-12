@@ -2,8 +2,8 @@
 
 Shared Android packaging and device-verification plumbing for native game ports.
 
-Lucent owns the reusable Android runtime shell (SDL Activity, app-private data, SAF staging, and raw
-touch contacts). A game owns its package identity, native entry point, game-file validation, touch
+The shared Android framework owns the reusable Android runtime shell (SDL Activity, persistent package
+storage, SAF ZIP staging, resumable copies, notifications, and raw touch contacts). A game owns its package identity, native entry point, game-file validation, touch
 actions/layout, UI art, and release evidence. This repository owns the build/packaging seam between
 them: pinned Gradle/NDK contract validation, the common cross-compiled native
 dependency prefix, native-artifact staging, APK inspection, and the common Android
