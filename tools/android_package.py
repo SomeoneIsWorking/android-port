@@ -43,15 +43,16 @@ def verify_native_entry(library: Path, ndk: Path, entry: str = "main") -> None:
         )
 
 
-def stage_gradle_runtime(prefix: Path, project: Path, lucent_java: Path) -> None:
+def stage_gradle_runtime(prefix: Path, project: Path) -> None:
     sources = (
         (prefix / "share/android-port/sdl3-java", project / "app/src/main/java"),
-        (lucent_java, project / "app/src/main/java"),
+        (prefix / "share/android-port/framework-java", project / "app/src/main/java"),
         (prefix / "share/android-port/gradle-wrapper", project),
     )
-    for source, destination in sources:
+    for source, _ in sources:
         if not source.is_dir():
             raise SystemExit(f"Android runtime source directory is missing: {source}")
+    for source, destination in sources:
         shutil.copytree(source, destination, dirs_exist_ok=True)
 
 

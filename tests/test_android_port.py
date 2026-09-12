@@ -298,6 +298,37 @@ def main() -> int:
                     assert "does not export a defined visible" in str(error)
                 assert refused != accepted, output
                 assert "--wide" in run.call_args.args[0]
+    with temporary_directory() as temporary:
+        root = Path(temporary)
+        prefix = root / "prefix"
+        project = root / "title"
+        sdl = prefix / "share/android-port/sdl3-java/org/libsdl/app/SDLActivity.java"
+        wrapper = prefix / "share/android-port/gradle-wrapper/gradlew"
+        framework = (
+            prefix
+            / "share/android-port/framework-java/io/github/someoneisworking/android/AndroidActivity.java"
+        )
+        for source in (sdl, wrapper):
+            source.parent.mkdir(parents=True)
+            source.write_text(source.name, encoding="utf-8")
+        try:
+            android_port.stage_gradle_runtime(prefix, project)
+        except SystemExit as error:
+            assert "framework-java" in str(error)
+        else:
+            raise AssertionError("staging accepted a prefix without Android framework Java")
+        assert not (project / "app/src/main/java").exists()
+        framework.parent.mkdir(parents=True)
+        framework.write_text("AndroidActivity", encoding="utf-8")
+        android_port.stage_gradle_runtime(prefix, project)
+        assert (project / "app/src/main/java/org/libsdl/app/SDLActivity.java").read_text(
+            encoding="utf-8"
+        ) == "SDLActivity.java"
+        assert (
+            project
+            / "app/src/main/java/io/github/someoneisworking/android/AndroidActivity.java"
+        ).read_text(encoding="utf-8") == "AndroidActivity"
+        assert (project / "gradlew").read_text(encoding="utf-8") == "gradlew"
     print("android-port: shared prefix, package, Java and AVD contracts passed")
     return 0
 
