@@ -9,7 +9,14 @@ PACKAGE = "io.github.someoneisworking.android"
 SOURCE = ROOT / "android_port" / "java" / Path(*PACKAGE.split("."))
 TESTS = ROOT / "tests" / "java" / Path(*PACKAGE.split("."))
 BUILD = ROOT / "build" / "java-tests"
-SCENARIOS = ("TouchContacts", "ImportLifetime", "ImportPromotion", "ImportRequest", "ImportResume")
+SCENARIOS = (
+    "TouchContacts",
+    "ImportLifetime",
+    "ImportPromotion",
+    "ImportRequest",
+    "ImportResume",
+    "ImportSelection",
+)
 
 
 def main() -> None:
