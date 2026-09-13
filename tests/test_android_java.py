@@ -16,6 +16,7 @@ SCENARIOS = (
     "ImportRequest",
     "ImportResume",
     "ImportSelection",
+    "StdioFraming",
 )
 
 

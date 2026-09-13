@@ -32,6 +32,9 @@ public class AndroidActivity extends SDLActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Before anything native can report: an application has no console, so a native write
+        // would otherwise be lost — including a watchdog's fatal report from a signal handler.
+        AndroidStdioLog.redirect(getPackageName());
         hideSystemUI();
     }
 
