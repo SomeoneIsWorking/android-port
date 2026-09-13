@@ -3,6 +3,7 @@ package io.github.someoneisworking.android;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.ClipData;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -17,7 +18,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -48,11 +52,14 @@ public final class AndroidDocumentImport {
         public final File stagingDirectory;
         public final String documentName;
         public final boolean isTree;
+        public final List<String> documentNames;
 
-        private Result(File stagingDirectory, String documentName, boolean isTree) {
+        private Result(File stagingDirectory, String documentName, boolean isTree,
+                       List<String> documentNames) {
             this.stagingDirectory = stagingDirectory;
             this.documentName = documentName;
             this.isTree = isTree;
+            this.documentNames = Collections.unmodifiableList(documentNames);
         }
     }
 
@@ -152,11 +159,25 @@ public final class AndroidDocumentImport {
         begin(requestCode, callback, false);
     }
 
+    /**
+     * Lets the player select several documents at once (for example the three
+     * files that make up one install). Every selection is copied into the same
+     * private staging directory under its own display name, so a consumer sees
+     * one directory exactly as it would from a folder tree.
+     */
+    public synchronized void pickDocuments(int requestCode, Callback callback) {
+        begin(requestCode, callback, false, true);
+    }
+
     public synchronized void pickTree(int requestCode, Callback callback) {
         begin(requestCode, callback, true);
     }
 
     private void begin(int requestCode, Callback callback, boolean tree) {
+        begin(requestCode, callback, tree, false);
+    }
+
+    private void begin(int requestCode, Callback callback, boolean tree, boolean multiple) {
         if (callback == null) {
             throw new IllegalArgumentException("callback is required");
         }
@@ -168,6 +189,9 @@ public final class AndroidDocumentImport {
         if (!tree) {
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             intent.setType("*/*");
+            if (multiple) {
+                intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            }
         }
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         if (tree) {
@@ -186,20 +210,37 @@ public final class AndroidDocumentImport {
         if (!request.accept(code)) {
             return false;
         }
-        Uri source = resultCode == Activity.RESULT_OK && data != null ? data.getData() : null;
-        if (source == null) {
+        List<Uri> reported = new ArrayList<>();
+        if (resultCode == Activity.RESULT_OK && data != null) {
+            ClipData clip = data.getClipData();
+            if (clip != null) {
+                for (int index = 0; index < clip.getItemCount(); ++index) {
+                    Uri item = clip.getItemAt(index).getUri();
+                    if (item != null) {
+                        reported.add(item);
+                    }
+                }
+            } else if (data.getData() != null) {
+                reported.add(data.getData());
+            }
+        }
+        List<Uri> sources = AndroidImportSelection.uniqueSources(reported);
+        if (sources.isEmpty()) {
             finishCancelled();
             return true;
         }
         try {
-            persistReadPermission(source, data.getFlags());
+            for (Uri source : sources) {
+                persistReadPermission(source, data.getFlags());
+            }
         } catch (SecurityException | IllegalArgumentException error) {
             finishFailure("Android could not retain access to the selected files.");
             return true;
         }
         workerActive = true;
+        List<Uri> selection = new ArrayList<>(sources);
         boolean isTree = request.tree();
-        worker = new Thread(() -> importSelection(source, isTree), "android-document-import");
+        worker = new Thread(() -> importSelection(selection, isTree), "android-document-import");
         worker.start();
         return true;
     }
@@ -319,26 +360,43 @@ public final class AndroidDocumentImport {
         activity.getContentResolver().takePersistableUriPermission(source, flags);
     }
 
-    private void importSelection(Uri source, boolean isTree) {
+    private void importSelection(List<Uri> sources, boolean isTree) {
         File staging = null;
         try {
-            String documentName = isTree ? "" : readDocumentName(source);
-            if (!isTree) validateLeafName(documentName);
-            staging = isTree ? createStaging() : findOrCreateResumableStaging(documentName, source);
             Budget budget = new Budget(limits);
-            if (!isTree) budget.setTotalBytes(sourceSize(source));
+            List<String> documentNames = new ArrayList<>();
             if (isTree) {
-                copyTree(source, DocumentsContract.getTreeDocumentId(source), staging, budget);
+                Uri tree = sources.get(0);
+                staging = createStaging();
+                copyTree(tree, DocumentsContract.getTreeDocumentId(tree), staging, budget);
             } else {
-                budget.addEntry(-1);
-                File target = new File(staging, documentName);
-                long existing = target.isFile() ? target.length() : 0;
-                budget.addBytes(existing);
-                copyFile(source, target, budget, -1, existing);
+                if (sources.size() == 1) {
+                    budget.setTotalBytes(sourceSize(sources.get(0)));
+                }
+                for (Uri source : sources) {
+                    String documentName = readDocumentName(source);
+                    validateLeafName(documentName);
+                    AndroidImportSelection.requireUnusedName(documentNames, documentName);
+                    if (staging == null) {
+                        staging = findOrCreateResumableStaging(documentName, source);
+                    }
+                    budget.addEntry(-1);
+                    File target = new File(staging, documentName);
+                    long existing = target.isFile() ? target.length() : 0;
+                    budget.addBytes(existing);
+                    if (sources.size() == 1) {
+                        copyFile(source, target, budget, -1, existing);
+                    } else {
+                        copyFile(source, target, budget, -1, 0);
+                    }
+                    documentNames.add(documentName);
+                }
             }
             File completedStaging = staging;
-            String completedName = documentName;
-            activity.runOnUiThread(() -> finishSuccess(new Result(completedStaging, completedName, isTree)));
+            String completedName = documentNames.size() == 1 ? documentNames.get(0) : "";
+            List<String> completedNames = new ArrayList<>(documentNames);
+            activity.runOnUiThread(
+                    () -> finishSuccess(new Result(completedStaging, completedName, isTree, completedNames)));
         } catch (IOException | RuntimeException error) {
             // Keep an interrupted copy for resume. A changed source cannot
             // safely use that prefix, so discard the partial transaction.
