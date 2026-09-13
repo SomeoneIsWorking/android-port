@@ -141,10 +141,19 @@ The command rejects a different ADB serial before it acquires the lock.
 
 `android_port/java/io/github/someoneisworking/android` is the shared Android
 application framework. It owns Activity lifecycle helpers, SAF ZIP import,
-persistent OBB-backed staging, resumable copies, and determinate import
-notifications. Consumers provide title identity validation, package identity,
-and their UI wording. Lucent may be pinned for logging, configuration, or focused
+persistent OBB-backed staging, resumable copies, determinate import
+notifications, and the process's standard streams. Consumers provide title
+identity validation, package identity, and their UI wording. Lucent may be pinned
+for logging, configuration, or focused
 helpers; it does not own the Android application framework.
+
+An Android application has no console, so `AndroidActivity.onCreate` routes
+stdout and stderr into logcat (`AndroidStdioLog`): a duplicate pipe on descriptors
+1 and 2, read on a daemon thread. Without it a port's own diagnostics disappear —
+including a watchdog's fatal report, which a native signal handler writes with
+`write(2)` and which stays async-signal-safe through a pipe. Line framing is the
+platform-free half (`AndroidStdioFraming`), so a report written in several writes
+is logged as whole lines.
 
 A resumed document copy compares its staged prefix with the reopened SAF source
 before appending. If the provider changed the document at the same URI, the
@@ -159,7 +168,8 @@ Run the platform-free Java contracts with a JDK capable of targeting Java 17:
 uv run --frozen python tests/test_android_java.py
 ```
 
-This compiles and runs touch, import lifetime, publication, and picker-request
-tests in `build/java-tests/`; it needs no Android SDK. CI is configured to run
+This compiles and runs touch, import lifetime, publication, picker-request, and
+standard-stream framing tests in `build/java-tests/`; it needs no Android SDK. CI
+is configured to run
 the same command on Linux, macOS, and Windows with Java 17. Android-dependent
 Activity and SAF behavior is verified through consuming APKs.
