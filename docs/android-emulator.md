@@ -1,3 +1,32 @@
+# The shared SDK AVD needs a host GL driver, not SwiftShader
+
+`codex_shared_api35` cannot be launched headless with the emulator's bundled
+software renderer on this host. Both `-gpu swiftshader_indirect` and `-gpu guest`
+(which falls back to lavapipe, then still composes through SwiftShader GLES) kill
+`qemu-system-x86_64-headless` with SIGSEGV about 20 seconds in, as SurfaceFlinger
+starts its first composition. Measured on emulator 37.1.11, Fedora 44: the
+faulting thread is `RenderThread`, frame 0 is JIT-generated code reached from
+`emulator/lib64/gles_swiftshader/libGLESv2.so`, and the guest kernel log stops at
+`init: starting service 'bootanim'`. Nothing in the guest is wrong; the host
+renderer dies.
+
+What works is a real Mesa driver on a display the run owns:
+
+```sh
+systemd-run --user --collect --unit=<name>-xvfb /usr/bin/Xvfb :77 -screen 0 1280x800x24
+systemd-run --user --collect --unit=<name>-emulator --setenv=DISPLAY=:77 \
+  "$ANDROID_SDK_ROOT/emulator/emulator" -avd codex_shared_api35 \
+  -no-window -no-audio -no-boot-anim -gpu host -no-snapshot
+```
+
+The guest then reports `llvmpipe` through the emulator's GLES translator and
+boots in about 30 seconds. Use `systemd-run`, not `nohup`/`setsid`/`disown`: an
+agent's backgrounded emulator is otherwise reaped when its shell ends.
+
+llvmpipe on a 320x640 AVD window is still software rasterisation at a fraction of
+a phone's resolution. It establishes that a package installs, launches, renders
+and responds; it establishes nothing about Android performance.
+
 # ARM64 Cuttlefish on x86-64 Linux
 
 `tools/android_emulator.py` owns the optional cross-architecture device launcher.
