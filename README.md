@@ -155,6 +155,15 @@ including a watchdog's fatal report, which a native signal handler writes with
 platform-free half (`AndroidStdioFraming`), so a report written in several writes
 is logged as whole lines.
 
+`AndroidBackgroundDownload` downloads a title's list of files (`size\turl\tdestination`
+lines) on worker threads of its own under the same foreground dataSync notification, with a
+progress bar, so a paused Activity or game thread stops nothing and Android keeps the process.
+Each file lands beside its destination with the title's partial suffix, resumes there with a
+Range request on a later start, and is renamed into place at its listed size; checking contents
+stays the title's. The transport is platform-free (`AndroidDownloadQueue`), polled as JSON.
+It asks for `POST_NOTIFICATIONS` on Android 13+, so a title declares that permission,
+`FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC` and `AndroidImportService`.
+
 A resumed document copy compares its staged prefix with the reopened SAF source
 before appending. If the provider changed the document at the same URI, the
 framework discards that partial copy and refuses the attempt; the next selection
