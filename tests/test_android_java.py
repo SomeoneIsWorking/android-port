@@ -11,6 +11,7 @@ TESTS = ROOT / "tests" / "java" / Path(*PACKAGE.split("."))
 BUILD = ROOT / "build" / "java-tests"
 SCENARIOS = (
     "TouchContacts",
+    "DownloadQueue",
     "ImportLifetime",
     "ImportPromotion",
     "ImportRequest",
@@ -38,7 +39,7 @@ def main() -> None:
         cwd=ROOT,
     )
     for name in SCENARIOS:
-        arguments = [str(BUILD / name.lower())] if name in {"ImportPromotion", "ImportResume"} else []
+        arguments = [str(BUILD / name.lower())] if name in {"DownloadQueue", "ImportPromotion", "ImportResume"} else []
         subprocess.run(
             ["java", "-cp", str(classes), f"{PACKAGE}.Android{name}Test", *arguments],
             check=True,
