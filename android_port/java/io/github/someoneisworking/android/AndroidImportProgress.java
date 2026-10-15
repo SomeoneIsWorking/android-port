@@ -7,6 +7,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.drawable.Icon;
 import android.os.Build;
 
 /** Persistent import progress presentation; titles provide identity, wording and tap destination. */
@@ -51,6 +52,10 @@ public final class AndroidImportProgress {
         tap.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
+        int appIcon = context.getApplicationInfo().icon;
+        if (appIcon != 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            builder.setLargeIcon(Icon.createWithResource(context, appIcon));
+        }
         return builder.setContentTitle(title)
                 .setContentText(progress)
                 .setSmallIcon(android.R.drawable.stat_sys_download)
