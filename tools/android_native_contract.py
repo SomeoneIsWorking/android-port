@@ -67,6 +67,12 @@ DEPENDENCY_CAPABILITY_FILES = {
         "lib/libsharpyuv.a",
         "share/WebP/cmake/WebPConfig.cmake",
     ),
+    # SDL3_image built with its WebP decoder over the prefix's libwebp.
+    "image_webp": (
+        "lib/libSDL3_image.a",
+        "lib/libwebp.a",
+        "lib/libwebpdemux.a",
+    ),
     "vorbis": (
         "include/vorbis/vorbisfile.h",
         "lib/libogg.a",

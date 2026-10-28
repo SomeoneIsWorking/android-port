@@ -128,8 +128,8 @@ uv run --frozen python tools/android_port.py stage-package-runtime \
   --profile platform/android/android-port-profile.json
 ```
 
-The bounded capabilities are `sdl3`, `image`, `font`, `format`, `text`, `bzip2`, `tls`, `http`,
-`webp`, `vorbis` and `media`. `sdl3` is required because
+The bounded capabilities are `sdl3`, `png`, `image`, `image_webp` (SDL3_image decoding WebP), `font`,
+`format`, `text`, `shaping`, `sqlite`, `json`, `svg`, `bzip2`, `tls`, `http`, `webp`, `vorbis` and `media`. `sdl3` is required because
 every package stages its SDL runtime; the other entries name the title's actual image, font/FreeType,
 fmt, and FFmpeg needs. This refuses unknown or duplicate selections, a prefix whose manifest ABI/API or
 declared capabilities do not match the profile, an incomplete selected capability, or a setup-only
