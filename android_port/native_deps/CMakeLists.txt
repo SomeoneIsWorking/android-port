@@ -116,7 +116,7 @@ ExternalProject_Add(sdl3_image
   GIT_TAG ${ANDROID_PORT_SDL3_IMAGE_REVISION}
   GIT_SHALLOW TRUE
   GIT_SUBMODULES ""
-  DEPENDS sdl3 libpng webp
+  DEPENDS sdl3 libpng
   CMAKE_ARGS
     ${ANDROID_PORT_COMMON_CMAKE_ARGS}
     -DCMAKE_PREFIX_PATH=${CMAKE_INSTALL_PREFIX}
@@ -263,6 +263,8 @@ ExternalProject_Add(webp
     -DWEBP_BUILD_WEBPMUX=OFF
     -DWEBP_BUILD_EXTRAS=OFF
   BUILD_BYPRODUCTS "${CMAKE_INSTALL_PREFIX}/lib/libwebp.a")
+# SDL3_image's WebP decoder links the prefix's libwebp.
+add_dependencies(sdl3_image webp)
 
 ExternalProject_Add(ogg
   PREFIX "${CMAKE_BINARY_DIR}/ogg"
