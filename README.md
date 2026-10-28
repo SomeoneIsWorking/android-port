@@ -8,11 +8,17 @@ actions/layout, UI art, and release evidence. This repository owns the build/pac
 them: pinned Gradle/NDK contract validation, the common cross-compiled native
 dependency prefix, native-artifact staging, APK inspection, and the common Android
 Virtual Device policy. The prefix holds the pinned SDL3, SDL3_image, SDL3_ttf, FreeType,
-fmt, bzip2, and minimal static FFmpeg set required by native ports; its manifest records
+fmt, bzip2, OpenSSL 3, curl, libwebp, libogg/libvorbis and minimal static FFmpeg set
+required by native ports; its manifest records
 the ABI/API and FFmpeg configuration so a title never combines host libraries with
 Android artifacts. FFmpeg retains MPEG-PS/MPEG-1/ADX and includes ASF with
 WMA1/WMA2/WMA Pro/WMA Voice; this feature list participates in the cache contract.
 `text` selects SDL3_ttf and `bzip2` selects the bounded-installer dependency.
+`tls` is static OpenSSL (libssl, libcrypto), `http` static libcurl over it, `webp` libwebp with
+sharpyuv/demux/mux, `vorbis` libogg/libvorbis/libvorbisfile. Release tarballs are pinned by
+SHA-256 in `android_port/native_deps/CMakeLists.txt`. zlib is the NDK's system `libz` (the prefix's
+`libz.a` is SDL_image's vendored copy; link `-lz` through `find_package(ZLIB)`, not `-L<prefix>`); curl has
+no compiled-in CA store, so a title passes its own CA bundle to each handle.
 
 Native-prefix mechanics live in `tools/android_native_dependencies.py`, shared
 input contracts in `android_native_contract.py`, media builds in `android_media.py`,
@@ -63,7 +69,8 @@ uv run --frozen python tools/android_port.py with-emulator-lock \
 ## Consumer contract
 
 A consumer invokes this tool to build the configured SDK/NDK native prefix before
-its own CMake and Gradle build:
+its own CMake and Gradle build. The prefix is built once per NDK, API and pin set into a shared
+location outside any repository, e.g. `~/.local/share/android-port-deps/ndk-<version>/android-<api>/<abi>`:
 
 ```sh
 uv run --frozen python tools/android_port.py build-native-deps \
@@ -118,7 +125,8 @@ uv run --frozen python tools/android_port.py stage-package-runtime \
   --profile platform/android/android-port-profile.json
 ```
 
-The bounded capabilities are `sdl3`, `image`, `font`, `format`, and `media`. `sdl3` is required because
+The bounded capabilities are `sdl3`, `image`, `font`, `format`, `text`, `bzip2`, `tls`, `http`,
+`webp`, `vorbis` and `media`. `sdl3` is required because
 every package stages its SDL runtime; the other entries name the title's actual image, font/FreeType,
 fmt, and FFmpeg needs. This refuses unknown or duplicate selections, a prefix whose manifest ABI/API or
 declared capabilities do not match the profile, an incomplete selected capability, or a setup-only

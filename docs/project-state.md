@@ -19,7 +19,7 @@ package contract on the declared Android ABI/API floor.
 
 | ID | Capability or outcome | State | Factual dependency | Goals |
 | --- | --- | --- | --- | --- |
-| S001 | Pinned Android native dependency prefix for SDL3, SDL3_image, SDL3_ttf, FreeType, fmt, bzip2, and FFmpeg | partial | — | — |
+| S001 | Pinned Android native dependency prefix for SDL3, SDL3_image, SDL3_ttf, FreeType, fmt, bzip2, OpenSSL, curl, libwebp, libogg/libvorbis and FFmpeg | partial | — | — |
 | S002 | Profile-owned ABI/API/capability validation | verified | S001 | — |
 | S003 | Exact runtime library staging for a title package | verified | S001, S002 | — |
 | S004 | Shared emulator lock and serial policy | partial | S002 | — |
@@ -36,6 +36,9 @@ still need their complete title build and package gate.
 Evidence: the revisions/checksum and media feature contract are tracked; an
 NDK 28.2.13676358 Clang arm64-v8a/API 24 build produced the complete native prefix,
 including SDL3_ttf, bzip2, and ASF/WMA alongside the existing MPEG1/ADX path.
+NDK 28.2.13676358 arm64-v8a and x86_64/API 21 builds added OpenSSL 3.5.9, curl 8.23.0,
+libwebp 1.6.0, libogg 1.3.6 and libvorbis 1.3.7; a `-Wl,--no-undefined` shared object using
+curl over TLS, WebP and vorbisfile links for both ABIs.
 The synthetic test checks profile, package, and capability positives/negatives.
 Gap: a consumer must still complete its title build and package gate.
 
