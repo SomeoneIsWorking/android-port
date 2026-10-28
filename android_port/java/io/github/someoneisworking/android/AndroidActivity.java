@@ -91,6 +91,8 @@ public class AndroidActivity extends SDLActivity {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Hidden bars still inset a decor that fits them; below API 35 that strip shows the theme's background.
+            window.setDecorFitsSystemWindows(false);
             WindowInsetsController controller = decor.getWindowInsetsController();
             if (controller != null) {
                 controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
