@@ -30,6 +30,28 @@ DEPENDENCY_CAPABILITY_FILES = {
         "lib/cmake/SDL3_ttf/SDL3_ttfConfig.cmake",
     ),
     "bzip2": ("include/bzlib.h", "lib/libbz2.a"),
+    "tls": (
+        "include/openssl/ssl.h",
+        "lib/libssl.a",
+        "lib/libcrypto.a",
+    ),
+    "http": (
+        "include/curl/curl.h",
+        "lib/libcurl.a",
+        "lib/cmake/CURL/CURLConfig.cmake",
+    ),
+    "webp": (
+        "include/webp/decode.h",
+        "lib/libwebp.a",
+        "lib/libsharpyuv.a",
+        "share/WebP/cmake/WebPConfig.cmake",
+    ),
+    "vorbis": (
+        "include/vorbis/vorbisfile.h",
+        "lib/libogg.a",
+        "lib/libvorbis.a",
+        "lib/libvorbisfile.a",
+    ),
     "media": (
         "include/libavutil/avutil.h",
         "lib/libavformat.a",

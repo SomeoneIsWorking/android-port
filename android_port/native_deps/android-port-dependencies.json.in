@@ -8,5 +8,10 @@
   "fmtRevision": "@ANDROID_PORT_FMT_REVISION@",
   "sdl3TtfRevision": "@ANDROID_PORT_SDL3_TTF_REVISION@",
   "bzip2Revision": "@ANDROID_PORT_BZIP2_REVISION@",
+  "opensslVersion": "@ANDROID_PORT_OPENSSL_VERSION@",
+  "curlVersion": "@ANDROID_PORT_CURL_VERSION@",
+  "webpVersion": "@ANDROID_PORT_WEBP_VERSION@",
+  "oggVersion": "@ANDROID_PORT_OGG_VERSION@",
+  "vorbisVersion": "@ANDROID_PORT_VORBIS_VERSION@",
   "sdl3Java": "share/android-port/sdl3-java"
 }
