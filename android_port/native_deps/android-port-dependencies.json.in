@@ -13,5 +13,10 @@
   "webpVersion": "@ANDROID_PORT_WEBP_VERSION@",
   "oggVersion": "@ANDROID_PORT_OGG_VERSION@",
   "vorbisVersion": "@ANDROID_PORT_VORBIS_VERSION@",
+  "libpngRevision": "@ANDROID_PORT_LIBPNG_REVISION@",
+  "harfbuzzVersion": "@ANDROID_PORT_HARFBUZZ_VERSION@",
+  "sqliteVersion": "@ANDROID_PORT_SQLITE_VERSION@",
+  "jsonRevision": "@ANDROID_PORT_JSON_REVISION@",
+  "nanosvgRevision": "@ANDROID_PORT_NANOSVG_REVISION@",
   "sdl3Java": "share/android-port/sdl3-java"
 }

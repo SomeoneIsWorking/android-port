@@ -21,6 +21,14 @@ set(ANDROID_PORT_OGG_VERSION "1.3.6")
 set(ANDROID_PORT_OGG_SHA256 "5c8253428e181840cd20d41f3ca16557a9cc04bad4a3d04cce84808677fa1061")
 set(ANDROID_PORT_VORBIS_VERSION "1.3.7")
 set(ANDROID_PORT_VORBIS_SHA256 "b33cc4934322bcbf6efcbacf49e3ca01aadbea4114ec9589d1b1e9d20f72954b")
+set(ANDROID_PORT_LIBPNG_REVISION "cd952f49f95bb27154ae77dbb103032d95f6e580")
+set(ANDROID_PORT_HARFBUZZ_VERSION "15.0.0")
+set(ANDROID_PORT_HARFBUZZ_SHA256 "968536e9abd782f07f7954044c0c4020199fcdd39b41d221ec42d2a3be4a44df")
+set(ANDROID_PORT_SQLITE_VERSION "3.54.1")
+set(ANDROID_PORT_SQLITE_ARCHIVE "2026/sqlite-amalgamation-3540100.zip")
+set(ANDROID_PORT_SQLITE_SHA256 "0a9c8e34352dad46006aa82836d5383bff9dc6bc9ce5a60553c05aa30e6ad1f9")
+set(ANDROID_PORT_JSON_REVISION "55f93686c01528224f448c19128836e7df245f72")
+set(ANDROID_PORT_NANOSVG_REVISION "239e102ec2c691f2902e20ace2ed36ee4a35cfe6")
 
 set(ANDROID_PORT_COMMON_CMAKE_ARGS
   -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
@@ -78,20 +86,43 @@ ExternalProject_Add(fmt
     -DFMT_TEST=OFF
   BUILD_BYPRODUCTS "${CMAKE_INSTALL_PREFIX}/lib/libfmt.a")
 
+# zlib is the NDK's system libz.
+ExternalProject_Add(libpng
+  PREFIX "${CMAKE_BINARY_DIR}/libpng"
+  SOURCE_DIR "${CMAKE_BINARY_DIR}/sources/libpng"
+  GIT_REPOSITORY https://github.com/pnggroup/libpng.git
+  GIT_TAG ${ANDROID_PORT_LIBPNG_REVISION}
+  GIT_SHALLOW TRUE
+  CMAKE_ARGS
+    ${ANDROID_PORT_COMMON_CMAKE_ARGS}
+    -DPNG_SHARED=OFF
+    -DPNG_STATIC=ON
+    -DPNG_FRAMEWORK=OFF
+    -DPNG_TESTS=OFF
+    -DPNG_TOOLS=OFF
+  BUILD_BYPRODUCTS "${CMAKE_INSTALL_PREFIX}/lib/libpng16.a")
+# libpng.pc requires zlib.pc; this one names the sysroot's libz.
+configure_file(zlib.pc.in zlib.pc @ONLY)
+ExternalProject_Add_Step(libpng zlib_pc
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_BINARY_DIR}/zlib.pc"
+    "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig/zlib.pc"
+  DEPENDEES install
+  DEPENDS "${CMAKE_BINARY_DIR}/zlib.pc")
+
 ExternalProject_Add(sdl3_image
   PREFIX "${CMAKE_BINARY_DIR}/sdl3_image"
   SOURCE_DIR "${CMAKE_BINARY_DIR}/sources/sdl3_image"
   GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
   GIT_TAG ${ANDROID_PORT_SDL3_IMAGE_REVISION}
   GIT_SHALLOW TRUE
-  GIT_SUBMODULES external/zlib external/libpng
-  GIT_SUBMODULES_RECURSE FALSE
-  DEPENDS sdl3
+  GIT_SUBMODULES ""
+  DEPENDS sdl3 libpng
   CMAKE_ARGS
     ${ANDROID_PORT_COMMON_CMAKE_ARGS}
+    -DCMAKE_PREFIX_PATH=${CMAKE_INSTALL_PREFIX}
     -DSDL3_DIR=${CMAKE_INSTALL_PREFIX}/lib/cmake/SDL3
     -DBUILD_SHARED_LIBS=OFF
-    -DSDLIMAGE_VENDORED=ON
+    -DSDLIMAGE_VENDORED=OFF
     -DSDLIMAGE_SHARED=OFF
     -DSDLIMAGE_STATIC=ON
     -DSDLIMAGE_INSTALL=ON
@@ -259,7 +290,64 @@ ExternalProject_Add(vorbis
     "${CMAKE_INSTALL_PREFIX}/lib/libvorbis.a"
     "${CMAKE_INSTALL_PREFIX}/lib/libvorbisfile.a")
 
+# Text shaping only: fonts are loaded by HarfBuzz's own OpenType reader, so no FreeType link.
+ExternalProject_Add(harfbuzz
+  PREFIX "${CMAKE_BINARY_DIR}/harfbuzz"
+  SOURCE_DIR "${CMAKE_BINARY_DIR}/sources/harfbuzz"
+  URL https://github.com/harfbuzz/harfbuzz/releases/download/${ANDROID_PORT_HARFBUZZ_VERSION}/harfbuzz-${ANDROID_PORT_HARFBUZZ_VERSION}.tar.xz
+  URL_HASH SHA256=${ANDROID_PORT_HARFBUZZ_SHA256}
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  CMAKE_ARGS
+    ${ANDROID_PORT_COMMON_CMAKE_ARGS}
+    -DBUILD_SHARED_LIBS=OFF
+    -DHB_HAVE_FREETYPE=OFF
+    -DHB_HAVE_GLIB=OFF
+    -DHB_HAVE_ICU=OFF
+    -DHB_HAVE_GOBJECT=OFF
+    -DHB_BUILD_UTILS=OFF
+    -DHB_BUILD_SUBSET=OFF
+  BUILD_BYPRODUCTS "${CMAKE_INSTALL_PREFIX}/lib/libharfbuzz.a")
+
+ExternalProject_Add(sqlite
+  PREFIX "${CMAKE_BINARY_DIR}/sqlite"
+  SOURCE_DIR "${CMAKE_BINARY_DIR}/sources/sqlite"
+  URL https://www.sqlite.org/${ANDROID_PORT_SQLITE_ARCHIVE}
+  URL_HASH SHA256=${ANDROID_PORT_SQLITE_SHA256}
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  CONFIGURE_COMMAND ${CMAKE_COMMAND}
+    -S "${CMAKE_CURRENT_SOURCE_DIR}/sqlite" -B <BINARY_DIR> -G Ninja
+    ${ANDROID_PORT_COMMON_CMAKE_ARGS} -DSQLITE_SOURCE=<SOURCE_DIR>
+    -DSQLITE_VERSION=${ANDROID_PORT_SQLITE_VERSION}
+  BUILD_BYPRODUCTS "${CMAKE_INSTALL_PREFIX}/lib/libsqlite3.a")
+
+ExternalProject_Add(json
+  PREFIX "${CMAKE_BINARY_DIR}/json"
+  SOURCE_DIR "${CMAKE_BINARY_DIR}/sources/json"
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG ${ANDROID_PORT_JSON_REVISION}
+  GIT_SHALLOW TRUE
+  CMAKE_ARGS
+    ${ANDROID_PORT_COMMON_CMAKE_ARGS}
+    -DJSON_BuildTests=OFF
+    -DJSON_Install=ON
+  BUILD_BYPRODUCTS "${CMAKE_INSTALL_PREFIX}/include/nlohmann/json.hpp")
+
+# Header-only; installed as include/nanosvg/ the way distributions package it.
+ExternalProject_Add(nanosvg
+  PREFIX "${CMAKE_BINARY_DIR}/nanosvg"
+  SOURCE_DIR "${CMAKE_BINARY_DIR}/sources/nanosvg"
+  GIT_REPOSITORY https://github.com/memononen/nanosvg.git
+  GIT_TAG ${ANDROID_PORT_NANOSVG_REVISION}
+  GIT_SHALLOW TRUE
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ""
+  INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_INSTALL_PREFIX}/include/nanosvg"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    <SOURCE_DIR>/src/nanosvg.h <SOURCE_DIR>/src/nanosvgrast.h
+    "${CMAKE_INSTALL_PREFIX}/include/nanosvg/")
+
 add_custom_target(android_port_native_dependencies
-  DEPENDS freetype sdl3 fmt sdl3_image sdl3_ttf bzip2 openssl curl webp ogg vorbis)
+  DEPENDS freetype sdl3 fmt libpng sdl3_image sdl3_ttf bzip2 openssl curl webp ogg vorbis
+    harfbuzz sqlite json nanosvg)
 
 configure_file(android-port-dependencies.json.in android-port-dependencies.json @ONLY)

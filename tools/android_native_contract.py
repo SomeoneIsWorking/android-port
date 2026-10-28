@@ -13,6 +13,12 @@ DEPENDENCY_CAPABILITY_FILES = {
         "share/android-port/sdl3-java/org/libsdl/app/SDLActivity.java",
         "share/android-port/gradle-wrapper/gradle/wrapper/gradle-wrapper.jar",
     ),
+    "png": (
+        "include/png.h",
+        "lib/libpng16.a",
+        "lib/pkgconfig/libpng.pc",
+        "lib/pkgconfig/zlib.pc",
+    ),
     "image": (
         "lib/libSDL3_image.a",
         "lib/cmake/SDL3_image/SDL3_imageConfig.cmake",
@@ -29,6 +35,21 @@ DEPENDENCY_CAPABILITY_FILES = {
         "lib/libSDL3_ttf.a",
         "lib/cmake/SDL3_ttf/SDL3_ttfConfig.cmake",
     ),
+    "shaping": (
+        "include/harfbuzz/hb.h",
+        "lib/libharfbuzz.a",
+        "lib/pkgconfig/harfbuzz.pc",
+    ),
+    "sqlite": (
+        "include/sqlite3.h",
+        "lib/libsqlite3.a",
+        "lib/pkgconfig/sqlite3.pc",
+    ),
+    "json": (
+        "include/nlohmann/json.hpp",
+        "share/cmake/nlohmann_json/nlohmann_jsonConfig.cmake",
+    ),
+    "svg": ("include/nanosvg/nanosvg.h", "include/nanosvg/nanosvgrast.h"),
     "bzip2": ("include/bzlib.h", "lib/libbz2.a"),
     "tls": (
         "include/openssl/ssl.h",
