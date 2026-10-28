@@ -69,7 +69,8 @@ DEPENDENCY_CAPABILITY_FILES = {
     ),
     # SDL3_image built with its WebP decoder over the prefix's libwebp.
     "image_webp": (
-        "lib/libSDL3_image.a",
+        # Installed only when SDL3_image found the prefix's libwebp and decodes WebP with it.
+        "lib/cmake/SDL3_image/Findwebp.cmake",
         "lib/libwebp.a",
         "lib/libwebpdemux.a",
     ),

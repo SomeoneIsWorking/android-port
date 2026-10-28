@@ -136,8 +136,16 @@ ExternalProject_Add(sdl3_image
     -DSDLIMAGE_GIF=OFF
     -DSDLIMAGE_JXL=OFF
     -DSDLIMAGE_TIF=OFF
+    -DSDLIMAGE_STRICT=ON
     -DSDLIMAGE_WEBP=ON
     -DSDLIMAGE_WEBP_SHARED=OFF
+    # The NDK toolchain searches only its sysroot, so the prefix's libwebp is named outright.
+    -Dwebp_LIBRARY=${CMAKE_INSTALL_PREFIX}/lib/libwebp.a
+    -Dwebp_INCLUDE_PATH=${CMAKE_INSTALL_PREFIX}/include
+    -Dwebpdemux_LIBRARY=${CMAKE_INSTALL_PREFIX}/lib/libwebpdemux.a
+    -Dwebpdemux_INCLUDE_PATH=${CMAKE_INSTALL_PREFIX}/include
+    -Dwebpmux_LIBRARY=${CMAKE_INSTALL_PREFIX}/lib/libwebpmux.a
+    -Dwebpmux_INCLUDE_PATH=${CMAKE_INSTALL_PREFIX}/include
     -DSDLIMAGE_PNG=ON
     -DSDLIMAGE_PNG_LIBPNG=ON
     -DSDLIMAGE_PNG_SAVE=ON
