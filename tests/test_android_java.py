@@ -11,6 +11,7 @@ TESTS = ROOT / "tests" / "java" / Path(*PACKAGE.split("."))
 BUILD = ROOT / "build" / "java-tests"
 SCENARIOS = (
     "TouchContacts",
+    "DocumentTreeIndex",
     "DownloadQueue",
     "ImportLifetime",
     "ImportPromotion",

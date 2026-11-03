@@ -152,7 +152,7 @@ The command rejects a different ADB serial before it acquires the lock.
 
 `android_port/java/io/github/someoneisworking/android` is the shared Android
 application framework. It owns Activity lifecycle helpers, SAF ZIP import,
-persistent OBB-backed staging, resumable copies, determinate import
+persistent OBB-backed staging, resumable copies, the player's shared-storage folder, determinate import
 notifications, and the process's standard streams. Consumers provide title
 identity validation, package identity, and their UI wording. Lucent may be pinned
 for logging, configuration, or focused
@@ -179,8 +179,33 @@ A resumed document copy compares its staged prefix with the reopened SAF source
 before appending. If the provider changed the document at the same URI, the
 framework discards that partial copy and refuses the attempt; the next selection
 starts clean.
-Android removes package-specific OBB storage on uninstall. Consumers that need
-files across uninstall must use a separate user-selected shared-storage contract.
+Android removes package-specific OBB storage on uninstall, so package storage is
+only import staging for a consumer whose files must survive one.
+
+`AndroidDocumentTree` is that shared-storage contract: a folder the player picks with
+`ACTION_OPEN_DOCUMENT_TREE` (`pick` suggests a primary-storage folder such as `Documents` on
+Android 8+). `accept` takes the persistable read/write grant and remembers the tree URI under a
+title key; `remembered` returns it while the grant persists. Files a previous install created there
+are not readable by filesystem path after a reinstall under scoped storage, and the grant itself
+dies with the package, so the folder is reached only through the document provider and a
+reinstalled title asks the player to pick the same folder again. Nothing needs
+`MANAGE_EXTERNAL_STORAGE`.
+
+Native code reaches the folder through five methods meant for JNI from any thread, each answering a
+negative errno on failure: `openDescriptor(path, mode, create, exclusive)` returns a detached
+descriptor from `ContentResolver.openFileDescriptor` that the caller owns; `status` returns
+`{directory, size, last-modified ms}` or null; `children`, `makeDirectory`, `delete(path,
+directory)` and `replace(from, to)` (same directory only, target deleted first, not atomic).
+Paths are tree-relative and case-exact. `AndroidDocumentTreeIndex` caches each directory's
+listing after its first provider query and is forgotten by every mutation made through the tree;
+nothing else may change a mounted tree.
+
+`publish(source, name, listener, callback)` copies a validated private directory into the folder on
+a worker thread, under `<name>.partial`, and replaces `<name>` only once the copy is complete.
+While it runs `AndroidDocumentTree.publishing()` is true and `cleanStaleImports` leaves staging
+alone; a marked staging whose resumable document was already discarded is reclaimed on the next
+start. `AndroidDocumentImport.discardPublished` removes a selection an earlier release promoted into
+package storage once the title keeps its install in the folder.
 
 Run the platform-free Java contracts with a JDK capable of targeting Java 17:
 
@@ -188,7 +213,7 @@ Run the platform-free Java contracts with a JDK capable of targeting Java 17:
 uv run --frozen python tests/test_android_java.py
 ```
 
-This compiles and runs touch, import lifetime, publication, picker-request, and
+This compiles and runs touch, document-tree index, import lifetime, publication, picker-request, and
 standard-stream framing tests in `build/java-tests/`; it needs no Android SDK. CI
 is configured to run
 the same command on Linux, macOS, and Windows with Java 17. Android-dependent

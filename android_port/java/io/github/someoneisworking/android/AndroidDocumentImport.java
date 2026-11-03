@@ -258,7 +258,7 @@ public final class AndroidDocumentImport {
 
     /** Removes abandoned staging only while no picker or import owns such a directory. */
     public synchronized void cleanStaleImports() {
-        if (active()) {
+        if (active() || AndroidDocumentTree.publishing()) {
             return;
         }
         File[] candidates = storageRoot.listFiles();
@@ -267,13 +267,24 @@ public final class AndroidDocumentImport {
         }
         for (File candidate : candidates) {
             if (candidate.getName().startsWith(STAGING_PREFIX)) {
-                if (!new File(candidate, SOURCE_MARKER).isFile()) {
+                if (!new File(candidate, SOURCE_MARKER).isFile() || !resumable(candidate)) {
                     AndroidImportPromotion.remove(candidate);
                 }
             } else if (candidate.getName().startsWith(PREVIOUS_PREFIX)) {
                 recoverPreviousSelection(candidate);
             }
         }
+    }
+
+    /* A marked staging resumes from its partial document; once that was discarded after
+       validation, an interrupted publication left nothing to resume. */
+    private static boolean resumable(File staging) {
+        File[] children = staging.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isFile() && !child.getName().equals(SOURCE_MARKER)) return true;
+        }
+        return false;
     }
 
     /**
@@ -301,6 +312,21 @@ public final class AndroidDocumentImport {
         File destination = privateChild(root, destinationName);
         File previous = privateChild(root, PREVIOUS_PREFIX + destinationName);
         return AndroidImportPromotion.publish(staging, selectedDirectory, destination, previous);
+    }
+
+    /**
+     * Removes a selection {@link #promoteValidated} published, once the title keeps its install
+     * somewhere else (for example in an {@link AndroidDocumentTree}). Absent is not an error.
+     */
+    public synchronized void discardPublished(String destinationName) throws IOException {
+        validateLeafName(destinationName);
+        if (active()) {
+            throw new IOException("cannot discard a published selection while an import is active");
+        }
+        File destination = privateChild(storageRoot.getCanonicalFile(), destinationName);
+        if (!AndroidImportPromotion.remove(destination)) {
+            throw new IOException("cannot discard the published " + destinationName);
+        }
     }
 
     /**
