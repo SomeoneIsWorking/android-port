@@ -6,6 +6,8 @@ import subprocess
 import zipfile
 from pathlib import Path
 
+from android_native_contract import ROOT
+
 
 def ndk_tool(ndk: Path, name: str) -> Path:
     candidates = list((ndk / "toolchains/llvm/prebuilt").glob("*/bin/" + name))
@@ -47,7 +49,8 @@ def verify_native_entry(library: Path, ndk: Path, entry: str = "main") -> None:
 def stage_gradle_runtime(prefix: Path, project: Path) -> None:
     sources = (
         (prefix / "share/android-port/sdl3-java", project / "app/src/main/java"),
-        (prefix / "share/android-port/framework-java", project / "app/src/main/java"),
+        # The framework's own Java is this checkout's, so a title takes its pinned revision.
+        (ROOT / "android_port/java", project / "app/src/main/java"),
         (prefix / "share/android-port/gradle-wrapper", project),
     )
     for source, _ in sources:

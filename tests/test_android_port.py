@@ -348,32 +348,29 @@ def main() -> int:
         project = root / "title"
         sdl = prefix / "share/android-port/sdl3-java/org/libsdl/app/SDLActivity.java"
         wrapper = prefix / "share/android-port/gradle-wrapper/gradlew"
-        framework = (
-            prefix
-            / "share/android-port/framework-java/io/github/someoneisworking/android/AndroidActivity.java"
-        )
-        for source in (sdl, wrapper):
-            source.parent.mkdir(parents=True)
-            source.write_text(source.name, encoding="utf-8")
+        sdl.parent.mkdir(parents=True)
+        sdl.write_text(sdl.name, encoding="utf-8")
         try:
             android_port.stage_gradle_runtime(prefix, project)
         except SystemExit as error:
-            assert "framework-java" in str(error)
+            assert "gradle-wrapper" in str(error)
         else:
-            raise AssertionError(
-                "staging accepted a prefix without Android framework Java"
-            )
+            raise AssertionError("staging accepted a prefix without the Gradle wrapper")
         assert not (project / "app/src/main/java").exists()
-        framework.parent.mkdir(parents=True)
-        framework.write_text("AndroidActivity", encoding="utf-8")
+        wrapper.parent.mkdir(parents=True)
+        wrapper.write_text(wrapper.name, encoding="utf-8")
         android_port.stage_gradle_runtime(prefix, project)
         assert (
             project / "app/src/main/java/org/libsdl/app/SDLActivity.java"
         ).read_text(encoding="utf-8") == "SDLActivity.java"
-        assert (
+        staged = (
             project
             / "app/src/main/java/io/github/someoneisworking/android/AndroidActivity.java"
-        ).read_text(encoding="utf-8") == "AndroidActivity"
+        ).read_text(encoding="utf-8")
+        checkout = (
+            ROOT / "android_port/java/io/github/someoneisworking/android/AndroidActivity.java"
+        ).read_text(encoding="utf-8")
+        assert staged == checkout, "the checkout's framework Java is staged, not the prefix's"
         assert (project / "gradlew").read_text(encoding="utf-8") == "gradlew"
     print("android-port: shared prefix, package, Java and AVD contracts passed")
     return 0
