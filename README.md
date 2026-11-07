@@ -219,3 +219,5 @@ standard-stream framing tests in `build/java-tests/`; it needs no Android SDK. C
 is configured to run
 the same command on Linux, macOS, and Windows with Java 17. Android-dependent
 Activity and SAF behavior is verified through consuming APKs.
+
+Built with AI assistance (Claude and other LLMs).
