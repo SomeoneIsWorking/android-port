@@ -33,6 +33,7 @@ from android_native_contract import (
     NATIVE_DEPS_SOURCE,
     NDK_TRIPLES,
     NativeDependencyRequest,
+    pinned_dependency_revisions,
 )
 from android_native_dependencies import (
     build_native_dependencies,
@@ -212,7 +213,7 @@ def load_android_port_profile(path: Path) -> AndroidPortProfile:
 
 
 def validate_native_dependency_prefix(profile: AndroidPortProfile) -> None:
-    """Reject a prefix that was not built for the profile's ABI and API."""
+    """Reject a prefix not built for the profile's ABI and API from the pinned revisions."""
     manifest = profile.prefix / "android-port-dependencies.json"
     try:
         value = json.loads(manifest.read_text(encoding="utf-8"))
@@ -222,7 +223,12 @@ def validate_native_dependency_prefix(profile: AndroidPortProfile) -> None:
         ) from error
     if not isinstance(value, dict):
         raise SystemExit(f"Android dependency manifest must be an object: {manifest}")
-    expected = {"schema": 1, "abi": profile.abi, "platform": f"android-{profile.api}"}
+    expected = {
+        "schema": 1,
+        "abi": profile.abi,
+        "platform": f"android-{profile.api}",
+        **pinned_dependency_revisions(),
+    }
     disagreements = [
         f"{key}={value.get(key)!r}, expected {wanted!r}"
         for key, wanted in expected.items()

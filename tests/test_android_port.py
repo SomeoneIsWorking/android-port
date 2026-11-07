@@ -143,6 +143,7 @@ def main() -> int:
                     "abi": "arm64-v8a",
                     "platform": "android-26",
                     "capabilities": list(android_port.DEPENDENCY_CAPABILITY_FILES),
+                    **android_port.pinned_dependency_revisions(),
                 }
             ),
             encoding="utf-8",
@@ -190,6 +191,19 @@ def main() -> int:
         assert (staged / "libmain.so").read_bytes() == b"title runtime"
         assert (staged / "libSDL3.so").read_bytes() == b"lib/libSDL3.so"
         assert (staged / "libc++_shared.so").read_bytes() == b"ndk runtime"
+        manifest = prefix / "android-port-dependencies.json"
+        current = manifest.read_text(encoding="utf-8")
+        manifest.write_text(
+            json.dumps({**json.loads(current), "sdl3Revision": "an older SDL"}),
+            encoding="utf-8",
+        )
+        try:
+            android_port.package_runtime_sources(profile)
+        except SystemExit as error:
+            assert "sdl3Revision='an older SDL'" in str(error)
+        else:
+            raise AssertionError("a prefix built from another SDL was accepted")
+        manifest.write_text(current, encoding="utf-8")
         assert android_port.profile_adb_command(
             profile, ["adb", "-s", "emulator-5554", "install", "game.apk"]
         ) == ("adb", "-s", "emulator-5554", "install", "game.apk")
@@ -231,6 +245,7 @@ def main() -> int:
                     "abi": "arm64-v8a",
                     "platform": "android-34",
                     "capabilities": list(android_port.DEPENDENCY_CAPABILITY_FILES),
+                    **android_port.pinned_dependency_revisions(),
                 }
             ),
             encoding="utf-8",
@@ -368,9 +383,12 @@ def main() -> int:
             / "app/src/main/java/io/github/someoneisworking/android/AndroidActivity.java"
         ).read_text(encoding="utf-8")
         checkout = (
-            ROOT / "android_port/java/io/github/someoneisworking/android/AndroidActivity.java"
+            ROOT
+            / "android_port/java/io/github/someoneisworking/android/AndroidActivity.java"
         ).read_text(encoding="utf-8")
-        assert staged == checkout, "the checkout's framework Java is staged, not the prefix's"
+        assert staged == checkout, (
+            "the checkout's framework Java is staged, not the prefix's"
+        )
         assert (project / "gradlew").read_text(encoding="utf-8") == "gradlew"
     print("android-port: shared prefix, package, Java and AVD contracts passed")
     return 0

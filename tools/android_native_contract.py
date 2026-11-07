@@ -1,5 +1,6 @@
 """Pinned Android prefix capabilities and build inputs shared by every consumer."""
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -106,3 +107,21 @@ class NativeDependencyRequest:
     api: int
     ndk: Path
     prefix: Path
+
+
+def pinned_dependency_revisions() -> dict[str, str]:
+    """The manifest key and value of each revision or version `native_deps` pins."""
+    pins = dict(
+        re.findall(
+            r'^set\((ANDROID_PORT_\w+) "([^"]*)"\)',
+            (NATIVE_DEPS_SOURCE / "CMakeLists.txt").read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+    )
+    template = (NATIVE_DEPS_SOURCE / "android-port-dependencies.json.in").read_text(
+        encoding="utf-8"
+    )
+    return {
+        key: pins[variable]
+        for key, variable in re.findall(r'"(\w+)": "@(ANDROID_PORT_\w+)@"', template)
+    }

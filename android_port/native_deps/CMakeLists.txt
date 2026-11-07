@@ -3,7 +3,7 @@ project(android_port_native_dependencies NONE)
 
 include(ExternalProject)
 
-set(ANDROID_PORT_SDL3_REVISION "147a8ee32dbf9ac02f3794964490687b6bbda1bc")
+set(ANDROID_PORT_SDL3_REVISION "a93b7e566e4e92cdcafc69766954ef69593fc998")
 set(ANDROID_PORT_SDL3_IMAGE_REVISION "bec9134a26c7d0f31b36d6083c25296e04cabff5")
 set(ANDROID_PORT_FREETYPE_REVISION "42608f77f20749dd6ddc9e0536788eaad70ea4b5")
 set(ANDROID_PORT_FMT_REVISION "407c905e45ad75fc29bf0f9bb7c5c2fd3475976f")
@@ -59,7 +59,7 @@ ExternalProject_Add(freetype
 ExternalProject_Add(sdl3
   PREFIX "${CMAKE_BINARY_DIR}/sdl3"
   SOURCE_DIR "${CMAKE_BINARY_DIR}/sources/sdl3"
-  GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+  GIT_REPOSITORY https://github.com/SomeoneIsWorking/SDL.git
   GIT_TAG ${ANDROID_PORT_SDL3_REVISION}
   GIT_SHALLOW TRUE
   CMAKE_ARGS
