@@ -2,7 +2,9 @@ package io.github.someoneisworking.android;
 
 import android.os.Build;
 import android.os.Bundle;
+import android.view.DisplayCutout;
 import android.view.MotionEvent;
+import android.view.RoundedCorner;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
@@ -17,6 +19,7 @@ import org.libsdl.app.SDLActivity;
  */
 public class AndroidActivity extends SDLActivity {
     private final AndroidTouchContacts touchContacts = new AndroidTouchContacts();
+    private volatile long contentInsets;
 
     /**
      * Installs title-owned contact interpretation without taking over Android or SDL event delivery.
@@ -36,6 +39,61 @@ public class AndroidActivity extends SDLActivity {
         // would otherwise be lost — including a watchdog's fatal report from a signal handler.
         AndroidStdioLog.redirect(getPackageName());
         hideSystemUI();
+        getWindow().getDecorView().setOnApplyWindowInsetsListener((view, insets) -> {
+            contentInsets = contentInsetsOf(insets);
+            return view.onApplyWindowInsets(insets);
+        });
+    }
+
+    /**
+     * Pixels in from each edge that content keeps clear of to be seen whole: the display cutout and
+     * the rounded corners, not the hidden bars' gesture strips. Packed 16 bits each, left lowest,
+     * then top, right and bottom; callable from any thread.
+     */
+    public long contentInsets() {
+        return contentInsets;
+    }
+
+    private static long contentInsetsOf(WindowInsets insets) {
+        int left = 0;
+        int top = 0;
+        int right = 0;
+        int bottom = 0;
+        DisplayCutout cutout = insets.getDisplayCutout();
+        if (cutout != null) {
+            left = cutout.getSafeInsetLeft();
+            top = cutout.getSafeInsetTop();
+            right = cutout.getSafeInsetRight();
+            bottom = cutout.getSafeInsetBottom();
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            int[] positions = {RoundedCorner.POSITION_TOP_LEFT, RoundedCorner.POSITION_TOP_RIGHT,
+                    RoundedCorner.POSITION_BOTTOM_RIGHT, RoundedCorner.POSITION_BOTTOM_LEFT};
+            for (int position : positions) {
+                RoundedCorner corner = insets.getRoundedCorner(position);
+                if (corner == null) {
+                    continue;
+                }
+                // A box whose corner stands this far in along both edges clears the arc.
+                int clear = (int) Math.ceil(corner.getRadius() * (1.0 - Math.sqrt(0.5)));
+                boolean atLeft = position == RoundedCorner.POSITION_TOP_LEFT
+                        || position == RoundedCorner.POSITION_BOTTOM_LEFT;
+                boolean atTop = position == RoundedCorner.POSITION_TOP_LEFT
+                        || position == RoundedCorner.POSITION_TOP_RIGHT;
+                if (atLeft) {
+                    left = Math.max(left, clear);
+                } else {
+                    right = Math.max(right, clear);
+                }
+                if (atTop) {
+                    top = Math.max(top, clear);
+                } else {
+                    bottom = Math.max(bottom, clear);
+                }
+            }
+        }
+        return (left & 0xFFFFL) | (top & 0xFFFFL) << 16 | (right & 0xFFFFL) << 32
+                | (bottom & 0xFFFFL) << 48;
     }
 
     @Override
