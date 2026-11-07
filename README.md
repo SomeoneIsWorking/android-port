@@ -7,11 +7,12 @@ storage, SAF ZIP staging, resumable copies, notifications, and raw touch contact
 actions/layout, UI art, and release evidence. This repository owns the build/packaging seam between
 them: pinned Gradle/NDK contract validation, the common cross-compiled native
 dependency prefix, native-artifact staging, APK inspection, and the common Android
-Virtual Device policy. The prefix holds the pinned SDL3, SDL3_image, SDL3_ttf, FreeType,
+Virtual Device policy. The prefix holds the pinned SDL3 (from the `SomeoneIsWorking/SDL` fork, which
+remakes a Vulkan surface Android lost while the app was away), SDL3_image, SDL3_ttf, FreeType,
 fmt, bzip2, OpenSSL 3, curl, libwebp, libogg/libvorbis, libpng, HarfBuzz, SQLite,
 nlohmann/json, nanosvg and minimal static FFmpeg set
 required by native ports; its manifest records
-the ABI/API and FFmpeg configuration so a title never combines host libraries with
+the ABI/API, every pinned revision and the FFmpeg configuration so a title never combines host libraries with
 Android artifacts. FFmpeg retains MPEG-PS/MPEG-1/ADX and includes ASF with
 WMA1/WMA2/WMA Pro/WMA Voice; this feature list participates in the cache contract.
 `text` selects SDL3_ttf and `bzip2` selects the bounded-installer dependency.
@@ -131,8 +132,8 @@ uv run --frozen python tools/android_port.py stage-package-runtime \
 The bounded capabilities are `sdl3`, `png`, `image`, `image_webp` (SDL3_image decoding WebP), `font`,
 `format`, `text`, `shaping`, `sqlite`, `json`, `svg`, `bzip2`, `tls`, `http`, `webp`, `vorbis` and `media`. `sdl3` is required because
 every package stages its SDL runtime; the other entries name the title's actual image, font/FreeType,
-fmt, and FFmpeg needs. This refuses unknown or duplicate selections, a prefix whose manifest ABI/API or
-declared capabilities do not match the profile, an incomplete selected capability, or a setup-only
+fmt, and FFmpeg needs. This refuses unknown or duplicate selections, a prefix whose manifest ABI/API, pinned
+revisions (`native_deps/CMakeLists.txt`) or declared capabilities do not match, which a title rebuilds, an incomplete selected capability, or a setup-only
 package without `libmain.so`. It stages exactly `libmain.so`, `libSDL3.so`, and the matching NDK
 `libc++_shared.so` below `jniLibs/<abi>/`; the title's package inspection then verifies the resulting APK
 and its own signing/asset policy.
